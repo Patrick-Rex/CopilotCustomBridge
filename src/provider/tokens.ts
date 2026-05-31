@@ -5,7 +5,7 @@
  * Phase 1 使用字符近似法：1 token ≈ 4 英文字符或 1 中文字符。
  */
 
-import type { OpenAIMessage } from '../client/types';
+import type { OpenAIMessage, OpenAIContentPart } from '../client/types';
 import * as logger from '../logger';
 
 /** 字符/token 换算比例 */
@@ -30,11 +30,14 @@ function isCJK(char: string): boolean {
  * 英文/ASCII: 每 4 字符 ≈ 1 token
  * 中文/CJK: 每 1 字符 ≈ 1 token
  * 每条消息额外 +4 token（role 开销）
+ * Phase 2: 支持多模态 content (OpenAIContentPart[])
  */
 export function estimateTokens(message: OpenAIMessage): number {
 	let tokens = 4; // role 开销
 
-	for (const char of message.content) {
+	// 提取纯文本用于 token 估算
+	const text = extractMessageText(message.content);
+	for (const char of text) {
 		if (isCJK(char)) {
 			tokens += 1;
 		} else {
@@ -42,6 +45,17 @@ export function estimateTokens(message: OpenAIMessage): number {
 		}
 	}
 	return tokens;
+}
+
+/** 从 OpenAIMessage.content 提取纯文本（兼容 string | OpenAIContentPart[]） */
+function extractMessageText(content: string | OpenAIContentPart[]): string {
+	if (typeof content === 'string') {
+		return content;
+	}
+	return content
+		.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+		.map(p => p.text)
+		.join('\n');
 }
 
 /** 估算消息列表总 token 数 */
@@ -55,9 +69,10 @@ export function estimateTotalTokens(messages: OpenAIMessage[]): number {
  */
 function summarize(message: OpenAIMessage): OpenAIMessage {
 	const maxPreview = 200;
-	const preview = message.content.length > maxPreview
-		? message.content.slice(0, maxPreview) + '...'
-		: message.content;
+	const text = extractMessageText(message.content);
+	const preview = text.length > maxPreview
+		? text.slice(0, maxPreview) + '...'
+		: text;
 
 	return {
 		...message,

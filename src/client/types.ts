@@ -30,7 +30,8 @@ export interface TokenUsage {
 
 export interface OpenAIMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool';
-	content: string;
+	/** 纯文本内容或多模态 parts（Phase 2: 视觉支持 image_url） */
+	content: string | OpenAIContentPart[];
 	/** 思考内容 (Phase 2: thinking 模式) */
 	reasoning_content?: string;
 	/** 工具调用 (Phase 2) */

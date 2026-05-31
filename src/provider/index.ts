@@ -115,32 +115,53 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			const capabilities = ConfigManager.getModelCapability(endpointId, apiModelId);
 
 			// 3a. Phase 2: 工具预飞 (preflight)
-		if (options.tools && options.tools.length > 0) {
-			const preflightTools = findPreflightTools(options.tools);
-			if (preflightTools.length > 0) {
-				logger.info(`预热工具: ${preflightTools.length} 个`);
-				// 结果由 VS Code 管理，此处仅追踪状态
+			if (options.tools && options.tools.length > 0) {
+				const preflightTools = findPreflightTools(options.tools);
+				if (preflightTools.length > 0) {
+					logger.info(`预热工具: ${preflightTools.length} 个`);
+					// 结果由 VS Code 管理，此处仅追踪状态
+				}
 			}
-		}
 
-		// 4. 获取 API Key
-		const apiKey = await AuthManager.getApiKey(endpointId);
-		if (!apiKey) {
-			this.reportError(progress, `请先为端点 "${found.endpoint.name}" 设置 API Key（命令: Set API Key）`);
-			return;
-		}
-		// 3b. Phase 2: 视觉处理 (T034)
-		const { resolvedMessages } = await resolveImageMessages(
-			messages as vscode.LanguageModelChatRequestMessage[],
-			endpointId,
-			apiModelId,
-			capabilities.imageInput ?? false,
-			token,
-		);
+			// 4. 获取 API Key
+			const apiKey = await AuthManager.getApiKey(endpointId);
+			if (!apiKey) {
+				this.reportError(progress, `请先为端点 "${found.endpoint.name}" 设置 API Key（命令: Set API Key）`);
+				return;
+			}
+			// 3b. Phase 2: 视觉处理 (T034)
+			// Phase 3: 诊断 — 记录原始消息结构 (仅 verbose 模式执行)
+			if (logger.getDebugMode() === 'verbose') {
+				logger.debug(`收到 ${messages.length} 条原始消息:`);
+				for (let mi = 0; mi < messages.length; mi++) {
+					const m = messages[mi];
+					const roleVal = (m as { role: number }).role;
+					const ct = typeof m.content;
+					const pt = Array.isArray(m.content)
+						? m.content.map((p: unknown) => (p as Record<string, unknown>)?.type ?? typeof p)
+						: undefined;
+					const keys = Array.isArray(m.content)
+						? m.content.map((p: unknown) => {
+							if (typeof p === 'object' && p !== null) {
+								return Object.keys(p as object).join(',');
+							}
+							return typeof p;
+						})
+						: undefined;
+					logger.debug(`  [${mi}] role=${roleVal} contentType=${ct} partTypes=${JSON.stringify(pt)} partKeys=${JSON.stringify(keys)}`);
+				}
+			}
+			const { resolvedMessages } = await resolveImageMessages(
+				messages as vscode.LanguageModelChatRequestMessage[],
+				endpointId,
+				apiModelId,
+				capabilities.imageInput ?? false,
+				token,
+			);
 
 		// 4. 消息转换
-		let openaiMessages = convertMessages(resolvedMessages);
-		if (openaiMessages.length === 0) {
+			let openaiMessages = convertMessages(resolvedMessages);
+			if (openaiMessages.length === 0) {
 				return;
 			}
 

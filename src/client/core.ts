@@ -242,6 +242,11 @@ class OpenAIClientImpl {
 					body: bodyJson,
 				};
 
+				// Phase 3: verbose 模式输出等效 curl 命令（API Key 已脱敏）
+				logger.debug(`>>> 请求 URL: ${url}`);
+				logger.debug(`>>> 请求体: ${bodyJson.slice(0, 500)}`);
+				logger.debug(`>>> curl 等效命令: curl '${url}' -H 'Content-Type: ${mergedHeaders['Content-Type']}' -H 'Authorization: Bearer <API_KEY>' -d '${bodyJson.replace(/'/g, "\\'")}'`);
+
 				// 代理支持
 				if (this.options.proxy) {
 					// Phase 1: undici.ProxyAgent 需要 Node 18+ 内置 undici

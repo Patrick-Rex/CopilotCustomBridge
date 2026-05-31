@@ -5,7 +5,7 @@
  */
 
 import type * as vscode from 'vscode';
-import type { OpenAIMessage } from '../client/types';
+import type { OpenAIMessage, OpenAIContentPart } from '../client/types';
 import * as logger from '../logger';
 
 /**
@@ -47,6 +47,9 @@ export function convertMessage(
 	// 提取文本内容
 	const content = extractTextContent(msg);
 
+	// Phase 2: 提取图片数据 (视觉支持)
+	const dataParts = extractDataParts(msg);
+
 	// Phase 2: 提取 tool call 和 tool result
 	const toolCalls = extractToolCalls(msg);
 	const toolCallId = extractToolCallId(msg);
@@ -72,21 +75,76 @@ export function convertMessage(
 		return { role: 'assistant' as const, content: content || '', reasoning_content: reasoningContent };
 	}
 
+	// Phase 2: 图片消息 — 将 data parts 转为 image_url 格式 (视觉支持)
+	if (dataParts.length > 0) {
+		const contentParts: OpenAIContentPart[] = [];
+		// 先添加文本（如有）
+		if (content) {
+			contentParts.push({ type: 'text', text: content });
+		}
+		// 添加图片
+		for (const dp of dataParts) {
+			const base64 = Buffer.from(dp.data).toString('base64');
+			contentParts.push({
+				type: 'image_url',
+				image_url: {
+					url: `data:${dp.mimeType};base64,${base64}`,
+				},
+			});
+		}
+		return { role, content: contentParts };
+	}
+
 	// 跳过空内容消息（保留 role 但内容为空通常无意义）
 	if (!content && role !== 'system') {
-		logger.debug(`跳过空内容消息 (role=${role})`);
+		if (logger.getDebugMode() === 'verbose') {
+			const diag = dumpContentStructure(msg.content);
+			logger.debug(`跳过空内容消息 (role=${role}, contentType=${diag.contentType}, partTypes=${JSON.stringify(diag.partTypes)}, partKeys=${JSON.stringify(diag.partKeys)})`);
+		}
 		return undefined;
+	}
+
+	// Phase 3: system 消息内容也为空时记录警告
+	if (!content && role === 'system') {
+		if (logger.getDebugMode() === 'verbose') {
+			const diag = dumpContentStructure(msg.content);
+			logger.debug(`system 消息内容为空 (contentType=${diag.contentType}, partTypes=${JSON.stringify(diag.partTypes)}, partKeys=${JSON.stringify(diag.partKeys)})`);
+		}
 	}
 
 	return { role, content };
 }
 
 /**
+ * Phase 3: 诊断辅助 — dump 消息 content 结构
+ */
+function dumpContentStructure(content: unknown): {
+	contentType: string;
+	partTypes: string[] | undefined;
+	partKeys: string[] | undefined;
+} {
+	const contentType = typeof content;
+	let partTypes: string[] | undefined;
+	let partKeys: string[] | undefined;
+	if (Array.isArray(content)) {
+		partTypes = content.map((p: unknown) => String((p as Record<string, unknown>)?.type ?? typeof p));
+		partKeys = content.map((p: unknown) => {
+			if (typeof p === 'object' && p !== null) {
+				return Object.keys(p as object).join(',');
+			}
+			return typeof p;
+		});
+	}
+	return { contentType, partTypes, partKeys };
+}
+
+/**
  * 从 VS Code 消息中提取纯文本内容
  *
  * LanguageModelChatRequestMessage 的内容可能是:
- * - LanguageModelTextPart (type: "text")
- * - 其他部分类型 Phase 1 忽略
+ * - 字符串
+ * - Part 数组，文本 Part 有 value 属性（可能无 type 字段）
+ * - 图片 Part 有 mimeType/data，不提取
  */
 function extractTextContent(msg: vscode.LanguageModelChatRequestMessage): string {
 	if (typeof msg.content === 'string') {
@@ -98,7 +156,8 @@ function extractTextContent(msg: vscode.LanguageModelChatRequestMessage): string
 		for (const part of msg.content) {
 			if (typeof part === 'object' && part !== null) {
 				const p = part as Record<string, unknown>;
-				if (p.type === 'text' && typeof p.value === 'string') {
+				// 文本 part: 有 value 且不是图片（无 mimeType）
+				if (typeof p.value === 'string' && !p.mimeType) {
 					parts.push(p.value);
 				}
 				// 忽略 tool call result, image 等其他类型
@@ -141,11 +200,12 @@ function extractToolCalls(msg: vscode.LanguageModelChatRequestMessage): OpenAIMe
 	const calls: NonNullable<OpenAIMessage['tool_calls']> = [];
 	for (const part of msg.content) {
 		const p = part as Record<string, unknown>;
-		if (p.type === 'function_result' && typeof p.name === 'string') {
-			// tool result part - handled separately
+		// 跳过 tool result part (有 callId 但没有 name)
+		if (typeof p.callId === 'string' && typeof p.name !== 'string') {
 			continue;
 		}
-		if (p.type === 'function' && typeof p.name === 'string') {
+		// function call part: 有 name 属性（无论有无 type 字段）
+		if (typeof p.name === 'string' && !p.mimeType) {
 			calls.push({
 				id: typeof p.callId === 'string' ? p.callId : '',
 				type: 'function',
@@ -167,7 +227,9 @@ function extractToolCallId(msg: vscode.LanguageModelChatRequestMessage): string 
 	}
 	for (const part of msg.content) {
 		const p = part as Record<string, unknown>;
-		if (p.type === 'function_result' && typeof p.callId === 'string') {
+		// tool result part: 有 callId 且无 name（function call 也有 callId，需区分）
+		// VS Code 可能不传 type 字段，用 hasCallId && !hasName 判断
+		if (typeof p.callId === 'string' && typeof p.name !== 'string') {
 			return p.callId;
 		}
 	}
@@ -181,6 +243,7 @@ function extractReasoningContent(msg: vscode.LanguageModelChatRequestMessage): s
 	}
 	for (const part of msg.content) {
 		const p = part as Record<string, unknown>;
+		// thinking part: 匹配 type==='thinking'（VS Code 可能不传 type，此时不提取）
 		if (p.type === 'thinking' && typeof p.value === 'string') {
 			return p.value;
 		}
@@ -189,7 +252,9 @@ function extractReasoningContent(msg: vscode.LanguageModelChatRequestMessage): s
 }
 
 /**
- * Phase 2: 提取图片数据部分 (LanguageModelDataPart)
+ * Phase 2: 提取图片数据部分
+ *
+ * VS Code 图片 Part 有 mimeType 和 data 属性（可能无 type 字段）
  */
 export function extractDataParts(
 	msg: vscode.LanguageModelChatRequestMessage,
@@ -200,7 +265,8 @@ export function extractDataParts(
 	const parts: Array<{ mimeType: string; data: Uint8Array }> = [];
 	for (const part of msg.content) {
 		const p = part as Record<string, unknown>;
-		if (p.type === 'data' && p.mimeType && p.data instanceof Uint8Array) {
+		// 图片 part: 有 mimeType 和 data（无论有无 type 字段）
+		if (typeof p.mimeType === 'string' && p.data instanceof Uint8Array) {
 			parts.push({ mimeType: p.mimeType as string, data: p.data as Uint8Array });
 		}
 	}
