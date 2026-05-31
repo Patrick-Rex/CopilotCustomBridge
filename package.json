@@ -1,13 +1,20 @@
 {
   "name": "copilot-custom-bridge",
   "displayName": "Copilot Custom Bridge",
-  "description": "VS Code extension for Copilot Custom Bridge",
+  "description": "在 Copilot Chat 中使用 OpenAI 兼容的第三方模型",
   "version": "0.0.1",
+  "publisher": "copilot-custom-bridge",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/copilot-custom-bridge"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "AI",
+    "Chat"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -16,20 +23,159 @@
   "contributes": {
     "commands": [
       {
-        "command": "copilot-custom-bridge.helloWorld",
-        "title": "Hello World"
+        "command": "copilot-custom-bridge.setApiKey",
+        "title": "Set API Key",
+        "category": "Copilot Custom Bridge"
+      },
+      {
+        "command": "copilot-custom-bridge.clearApiKey",
+        "title": "Clear API Key",
+        "category": "Copilot Custom Bridge"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Copilot Custom Bridge",
+      "properties": {
+        "copilot-custom-bridge.endpoints": {
+          "type": "array",
+          "default": [],
+          "description": "OpenAI 兼容 API 端点列表",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "baseUrl",
+              "models"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9-]+$",
+                "description": "端点唯一标识"
+              },
+              "name": {
+                "type": "string",
+                "description": "端点显示名称"
+              },
+              "baseUrl": {
+                "type": "string",
+                "description": "API 基础 URL"
+              },
+              "defaultHeaders": {
+                "type": "object",
+                "description": "额外请求头（可选）"
+              },
+              "models": {
+                "type": "array",
+                "minItems": 1,
+                "description": "模型列表",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "模型标识"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "模型显示名称"
+                    },
+                    "family": {
+                      "type": "string",
+                      "description": "模型家族"
+                    },
+                    "version": {
+                      "type": "string",
+                      "description": "版本号"
+                    },
+                    "maxInputTokens": {
+                      "type": "number",
+                      "default": 4096,
+                      "description": "最大输入 token"
+                    },
+                    "maxOutputTokens": {
+                      "type": "number",
+                      "default": 4096,
+                      "description": "最大输出 token"
+                    },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "toolCalling": {
+                          "type": [
+                            "boolean",
+                            "number"
+                          ],
+                          "default": false
+                        },
+                        "imageInput": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "thinking": {
+                          "type": "boolean",
+                          "default": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "copilot-custom-bridge.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "全局回退 API Key（推荐使用 SecretStorage）"
+        },
+        "copilot-custom-bridge.debugMode": {
+          "type": "string",
+          "default": "minimal",
+          "enum": [
+            "minimal",
+            "metadata",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "最少日志",
+            "含元数据日志",
+            "详细调试日志"
+          ],
+          "description": "调试模式"
+        },
+        "copilot-custom-bridge.modelIdOverrides": {
+          "type": "object",
+          "default": {},
+          "description": "模型 ID 覆盖映射"
+        },
+        "copilot-custom-bridge.maxTokens": {
+          "type": "number",
+          "default": 4096,
+          "description": "全局最大输出 token"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.0",
     "@types/node": "18.x",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.0",
+    "@vscode/vsce": "^3.9.1",
+    "mocha": "^10.2.0",
     "typescript": "^5.3.0"
   }
 }

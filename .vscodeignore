@@ -5,4 +5,13 @@ tsconfig.json
 .gitignore
 .eslintrc.json
 node_modules
-out/**
+specs/**
+docs/**
+resources/**
+.git/**
+.github/**
+.nvmrc
+*.vsix
+AGENTS.md
+.agents/**
+.specify/**

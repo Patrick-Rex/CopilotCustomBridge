@@ -1,13 +1,8 @@
-import * as vscode from 'vscode';
+/**
+ * 扩展入口 — 转发到 runtime/lifecycle
+ *
+ * 架构说明见 docs/design/architecture.md
+ * runtime/ 层负责生命周期、命令注册、Provider 注册。
+ */
 
-export function activate(context: vscode.ExtensionContext) {
-	console.log('Extension "copilot-custom-bridge" is now active!');
-
-	const disposable = vscode.commands.registerCommand('copilot-custom-bridge.helloWorld', () => {
-		vscode.window.showInformationMessage('Hello World from Copilot Custom Bridge!');
-	});
-
-	context.subscriptions.push(disposable);
-}
-
-export function deactivate() {}
+export { activate, deactivate } from './runtime/lifecycle';

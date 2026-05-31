@@ -8,3 +8,4 @@ dist/
 **/.agent*
 **/.specify
 **/.github
+**/specs
