@@ -15,6 +15,8 @@ import type {
 } from './types';
 import { SSE_DONE, HTTP_CONFIG, RETRY_CONFIG, RATE_LIMIT_MAX_RETRIES, RATE_LIMIT_MAX_WAIT_SEC } from '../consts';
 import * as logger from '../logger';
+import type { DumpPayload } from '../logger';
+export type { DumpPayload };
 
 /** 指数退避延迟 */
 function retryDelay(attempt: number): number {
@@ -67,16 +69,17 @@ async function parseSSEStream(
 	reader: ReadableStreamDefaultReader<Uint8Array>,
 	callbacks: StreamCallbacks,
 	cancelToken?: vscode.CancellationToken,
-): Promise<void> {
+): Promise<unknown[]> {
 	const decoder = new TextDecoder();
 	let lineBuffer = '';
 	let totalUsage: TokenUsage | undefined;
+	const chunks: unknown[] = []; // Phase 3: collected for dump
 
 	try {
 		while (true) {
 			// 检查取消
 			if (cancelToken?.isCancellationRequested) {
-				return; // 静默退出，不调用任何回调
+				return chunks; // Phase 3: return chunks for dump
 			}
 
 			const { done, value } = await reader.read();
@@ -96,7 +99,7 @@ async function parseSSEStream(
 				// [DONE] 信号
 				if (trimmed === `data: ${SSE_DONE}`) {
 					callbacks.onDone(totalUsage);
-					return;
+					return chunks;
 				}
 
 				// data: {...} JSON 行
@@ -104,6 +107,7 @@ async function parseSSEStream(
 					try {
 						const jsonStr = trimmed.slice(6);
 						const chunk = JSON.parse(jsonStr) as Record<string, unknown>;
+						chunks.push(chunk); // Phase 3: collect for dump
 
 						// 提取 delta
 						const choices = chunk?.choices as Array<Record<string, unknown>> | undefined;
@@ -150,6 +154,7 @@ async function parseSSEStream(
 
 		// 流正常结束
 		callbacks.onDone(totalUsage);
+		return chunks;
 	} catch (err) {
 		if (!cancelToken?.isCancellationRequested) {
 			callbacks.onError({
@@ -158,6 +163,7 @@ async function parseSSEStream(
 				raw: err,
 			});
 		}
+		return chunks;
 	}
 }
 
@@ -192,6 +198,17 @@ class OpenAIClientImpl {
 
 			try {
 				const url = `${this.baseUrl}${HTTP_CONFIG.CHAT_PATH}`;
+				const startTime = Date.now();
+
+				// T010: 构建请求体为变量以便转储
+				const requestBody = {
+					model: request.model,
+					messages: request.messages,
+					stream: true,
+					temperature: request.temperature ?? 0.7,
+					max_tokens: request.max_tokens,
+				};
+				const bodyJson = JSON.stringify(requestBody);
 
 				// 构建 fetch 选项
 				const fetchInit: RequestInit & { dispatcher?: unknown } = {
@@ -200,13 +217,7 @@ class OpenAIClientImpl {
 						'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
 						'Authorization': `Bearer ${this.apiKey}`,
 					},
-					body: JSON.stringify({
-						model: request.model,
-						messages: request.messages,
-						stream: true,
-						temperature: request.temperature ?? 0.7,
-						max_tokens: request.max_tokens,
-					}),
+					body: bodyJson,
 				};
 
 				// 代理支持
@@ -230,12 +241,32 @@ class OpenAIClientImpl {
 				try {
 					const response = await fetch(url, fetchInit);
 
+					// T010: 采集响应元数据
+					const responseStatus = response.status;
+					const responseHeaders: Record<string, string> = {};
+					response.headers.forEach((value, key) => {
+						responseHeaders[key] = value;
+					});
+
 					// 非 2xx 响应
 					if (!response.ok) {
 						let errorBody = '';
 						try {
 							errorBody = await response.text();
 						} catch { /* ignore */ }
+
+						// Phase 3: dump on error too
+						if (callbacks.onDump) {
+							callbacks.onDump({
+								requestUrl: url,
+								requestHeaders: fetchInit.headers as Record<string, string>,
+								requestBody,
+								responseStatus,
+								responseHeaders,
+								responseChunks: [{ error: errorBody }],
+								durationMs: Date.now() - startTime,
+							});
+						}
 
 						const error: ClientError = classifyError(response.status, errorBody || `HTTP ${response.status}`);
 						error.retryable = isRetryable(error);
@@ -276,7 +307,20 @@ class OpenAIClientImpl {
 					}
 
 					const reader = response.body.getReader();
-					await parseSSEStream(reader, callbacks, cancelToken);
+					const chunks = await parseSSEStream(reader, callbacks, cancelToken);
+
+					// Phase 3: dump after successful stream
+					if (callbacks.onDump) {
+						callbacks.onDump({
+							requestUrl: url,
+							requestHeaders: fetchInit.headers as Record<string, string>,
+							requestBody,
+							responseStatus,
+							responseHeaders,
+							responseChunks: chunks,
+							durationMs: Date.now() - startTime,
+						});
+					}
 					return;
 
 				} finally {

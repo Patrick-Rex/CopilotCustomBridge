@@ -120,6 +120,19 @@ export interface StreamCallbacks {
 	onToolCall?: (toolCall: OpenAIToolCallDelta) => void;
 	onError: (error: ClientError) => void;
 	onDone: (usage?: TokenUsage) => void;
+	/** Phase 3: dump callback — called after stream completes with full request/response metadata */
+	onDump?: (payload: StreamDumpPayload) => void;
+}
+
+/** Phase 3: dump payload passed from client to provider */
+export interface StreamDumpPayload {
+	requestUrl: string;
+	requestHeaders: Record<string, string>;
+	requestBody: unknown;
+	responseStatus: number;
+	responseHeaders: Record<string, string>;
+	responseChunks: unknown[];
+	durationMs: number;
 }
 
 // ============================================================================

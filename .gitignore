@@ -3,6 +3,7 @@ out/
 dist/
 *.vsix
 
+**/.idea
 
 ## .agent
 **/.agent*

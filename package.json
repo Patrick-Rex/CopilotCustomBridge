@@ -3,11 +3,17 @@
   "displayName": "Copilot Custom Bridge",
   "description": "在 Copilot Chat 中使用 OpenAI 兼容的第三方模型",
   "version": "0.0.1",
-  "publisher": "copilot-custom-bridge",
+  "publisher": "patrick-rex",
+  "icon": "resources/icon.svg",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
     "type": "git",
-    "url": "https://github.com/user/copilot-custom-bridge"
+    "url": "https://github.com/Patrick-Rex/CopilotCustomBridge"
+  },
+  "keywords": ["copilot", "openai", "custom-model", "chat", "bridge"],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -24,17 +30,27 @@
     "commands": [
       {
         "command": "copilot-custom-bridge.setApiKey",
-        "title": "Set API Key",
+        "title": "%command.setApiKey%",
         "category": "Copilot Custom Bridge"
       },
       {
         "command": "copilot-custom-bridge.clearApiKey",
-        "title": "Clear API Key",
+        "title": "%command.clearApiKey%",
         "category": "Copilot Custom Bridge"
       },
       {
         "command": "copilot-custom-bridge.detectModels",
-        "title": "Auto-detect Models",
+        "title": "%command.detectModels%",
+        "category": "Copilot Custom Bridge"
+      },
+      {
+        "command": "copilot-custom-bridge.openDumpDirectory",
+        "title": "%command.openDumpDirectory%",
+        "category": "Copilot Custom Bridge"
+      },
+      {
+        "command": "copilot-custom-bridge.gettingStarted",
+        "title": "%command.gettingStarted%",
         "category": "Copilot Custom Bridge"
       }
     ],
@@ -44,7 +60,7 @@
         "copilot-custom-bridge.endpoints": {
           "type": "array",
           "default": [],
-          "description": "OpenAI 兼容 API 端点列表",
+          "description": "%config.endpoints%",
           "items": {
             "type": "object",
             "required": [
@@ -57,23 +73,23 @@
               "id": {
                 "type": "string",
                 "pattern": "^[a-zA-Z0-9-]+$",
-                "description": "端点唯一标识"
+                "description": "%config.endpoints.items.id%"
               },
               "name": {
                 "type": "string",
-                "description": "端点显示名称"
+                "description": "%config.endpoints.items.name%"
               },
               "baseUrl": {
                 "type": "string",
-                "description": "API 基础 URL"
+                "description": "%config.endpoints.items.baseUrl%"
               },
               "defaultHeaders": {
                 "type": "object",
-                "description": "额外请求头（可选）"
+                "description": "%config.endpoints.items.defaultHeaders%"
               },
               "visionProxy": {
                 "type": "string",
-                "description": "默认视觉代理模型 ID（Phase 2）"
+                "description": "%config.endpoints.items.visionProxy%"
               },
               "defaultThinkingEffort": {
                 "type": "string",
@@ -83,12 +99,12 @@
                   "high",
                   "max"
                 ],
-                "description": "默认推理力度（Phase 2）"
+                "description": "%config.endpoints.items.defaultThinkingEffort%"
               },
               "models": {
                 "type": "array",
                 "minItems": 0,
-                "description": "模型列表（Phase 2: 可为空，配合自动探测）",
+                "description": "%config.endpoints.items.models%",
                 "items": {
                   "type": "object",
                   "required": [
@@ -98,29 +114,29 @@
                   "properties": {
                     "id": {
                       "type": "string",
-                      "description": "模型标识"
+                      "description": "%config.endpoints.items.models.items.id%"
                     },
                     "name": {
                       "type": "string",
-                      "description": "模型显示名称"
+                      "description": "%config.endpoints.items.models.items.name%"
                     },
                     "family": {
                       "type": "string",
-                      "description": "模型家族"
+                      "description": "%config.endpoints.items.models.items.family%"
                     },
                     "version": {
                       "type": "string",
-                      "description": "版本号"
+                      "description": "%config.endpoints.items.models.items.version%"
                     },
                     "maxInputTokens": {
                       "type": "number",
                       "default": 4096,
-                      "description": "最大输入 token"
+                      "description": "%config.endpoints.items.models.items.maxInputTokens%"
                     },
                     "maxOutputTokens": {
                       "type": "number",
                       "default": 4096,
-                      "description": "最大输出 token"
+                      "description": "%config.endpoints.items.models.items.maxOutputTokens%"
                     },
                     "capabilities": {
                       "type": "object",
@@ -142,7 +158,7 @@
                         },
                         "visionProxy": {
                           "type": "string",
-                          "description": "覆盖端点级视觉代理模型 ID（Phase 2）"
+                          "description": "%config.endpoints.items.models.items.capabilities.visionProxy%"
                         },
                         "thinkingEffort": {
                           "type": "string",
@@ -152,7 +168,7 @@
                             "high",
                             "max"
                           ],
-                          "description": "覆盖端点级推理力度（Phase 2）"
+                          "description": "%config.endpoints.items.models.items.capabilities.thinkingEffort%"
                         }
                       }
                     }
@@ -165,7 +181,7 @@
         "copilot-custom-bridge.apiKey": {
           "type": "string",
           "default": "",
-          "description": "全局回退 API Key（推荐使用 SecretStorage）"
+          "description": "%config.apiKey%"
         },
         "copilot-custom-bridge.debugMode": {
           "type": "string",
@@ -176,24 +192,54 @@
             "verbose"
           ],
           "enumDescriptions": [
-            "最少日志",
-            "含元数据日志",
-            "详细调试日志"
+            "%config.debugMode.minimal%",
+            "%config.debugMode.metadata%",
+            "%config.debugMode.verbose%"
           ],
-          "description": "调试模式"
+          "description": "%config.debugMode%"
         },
         "copilot-custom-bridge.modelIdOverrides": {
           "type": "object",
           "default": {},
-          "description": "模型 ID 覆盖映射"
+          "description": "%config.modelIdOverrides%"
         },
         "copilot-custom-bridge.maxTokens": {
           "type": "number",
           "default": 4096,
-          "description": "全局最大输出 token"
+          "description": "%config.maxTokens%"
         }
       }
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "copilot-custom-bridge.getting-started",
+        "title": "%walkthrough.title%",
+        "description": "%walkthrough.description%",
+        "steps": [
+          {
+            "id": "configureEndpoint",
+            "title": "%walkthrough.step1.title%",
+            "description": "%walkthrough.step1.description%",
+            "media": { "markdown": "resources/walkthrough/step1-endpoint.md" },
+            "completionEvents": ["onCommand:workbench.action.openSettingsJson"]
+          },
+          {
+            "id": "setApiKey",
+            "title": "%walkthrough.step2.title%",
+            "description": "%walkthrough.step2.description%",
+            "media": { "markdown": "resources/walkthrough/step2-apikey.md" },
+            "completionEvents": ["copilot-custom-bridge:apiKeySet"]
+          },
+          {
+            "id": "switchModel",
+            "title": "%walkthrough.step3.title%",
+            "description": "%walkthrough.step3.description%",
+            "media": { "markdown": "resources/walkthrough/step3-model.md" },
+            "completionEvents": ["onCommand:workbench.action.chat.open"]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

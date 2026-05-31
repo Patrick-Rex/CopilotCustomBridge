@@ -104,3 +104,26 @@ export const VISION_PROXY_PROMPT = 'Describe this image in detail.';
 
 /** 视觉代理请求超时 (ms) */
 export const VISION_PROXY_TIMEOUT_MS = 15000;
+
+// ============================================================================
+// Phase 3: 诊断转储常量
+// ============================================================================
+
+/** 转储目录名称 */
+export const DUMP_DIR_NAME = 'dumps';
+
+/** 转储文件名前缀 */
+export const DUMP_FILE_PREFIX = 'dump';
+
+/** 转储文件扩展名 */
+export const DUMP_FILE_EXT = '.json';
+
+/** 转储文件最大保留数量 */
+export const DUMP_MAX_FILES = 50;
+
+/** API Key 脱敏正则模式 (per research.md R4) */
+export const SANITIZE_PATTERNS: ReadonlyArray<[RegExp, string]> = [
+	[/Authorization:\s*Bearer\s+\S+/gi, 'Authorization: Bearer ***'],
+	[/"api_key"\s*:\s*"[^"]+"/gi, '"api_key": "***"'],
+	[/\b(sk-(?:or-)?[a-zA-Z0-9]{20,})\b/g, '***'],
+];

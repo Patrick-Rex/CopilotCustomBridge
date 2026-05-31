@@ -10,7 +10,7 @@ import { ConfigManager } from '../config';
 import { AuthManager } from '../auth';
 import { registerCommands } from './commands';
 import { registerProvider } from './provider';
-import { setDebugMode, dispose as disposeLogger } from '../logger';
+import { setDebugMode, dispose as disposeLogger, initDumpSystem } from '../logger';
 import * as logger from '../logger';
 
 /**
@@ -24,6 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		// 设置日志级别
 		const debugMode = ConfigManager.getDebugMode();
 		setDebugMode(debugMode);
+		initDumpSystem(context); // Phase 3: 初始化转储系统
 		logger.info(`Copilot Custom Bridge 启动 (debugMode=${debugMode})`);
 
 		// 注册命令

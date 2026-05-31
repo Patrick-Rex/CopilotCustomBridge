@@ -1,6 +1,6 @@
 ---
 title: "Docs 索引"
-updated: "2026-05-31"
+updated: "2026-06-01"
 ---
 
 # Docs 索引
@@ -19,7 +19,7 @@ docs/
 │   ├── csharp-coding-standard.md C# 代码编写规范
 │   └── python-encoding.md       Python 脚本编码规范
 └── guides/                      操作指南、环境搭建、故障排查
-    └── configuration.md         用户配置指南（Phase 3 完善）
+    └── configuration.md         用户配置指南
 ```
 
 ## 文件清单
@@ -35,16 +35,14 @@ docs/
 
 | 路径 | 说明 |
 |------|------|
-| [../specs/001-custom-bridge-mvp/spec.md](../specs/001-custom-bridge-mvp/spec.md) | Phase 1 MVP 功能规格 |
-| [../specs/001-custom-bridge-mvp/plan.md](../specs/001-custom-bridge-mvp/plan.md) | Phase 1 MVP 实现计划 |
-| [../specs/001-custom-bridge-mvp/tasks.md](../specs/001-custom-bridge-mvp/tasks.md) | Phase 1 MVP 任务清单 |
-| [../specs/001-custom-bridge-mvp/quickstart.md](../specs/001-custom-bridge-mvp/quickstart.md) | 中文快速入门 |
-| [../specs/001-custom-bridge-mvp/contracts/](../specs/001-custom-bridge-mvp/contracts/) | 接口合约（provider/client/config） |
-| [../specs/002-advanced-capabilities/spec.md](../specs/002-advanced-capabilities/spec.md) | Phase 2 高级能力功能规格 |
-| [../specs/002-advanced-capabilities/plan.md](../specs/002-advanced-capabilities/plan.md) | Phase 2 高级能力实现计划 |
-| [../specs/002-advanced-capabilities/tasks.md](../specs/002-advanced-capabilities/tasks.md) | Phase 2 高级能力任务清单 |
-| [../specs/002-advanced-capabilities/research.md](../specs/002-advanced-capabilities/research.md) | Phase 2 技术研究 |
-| [../specs/002-advanced-capabilities/data-model.md](../specs/002-advanced-capabilities/data-model.md) | Phase 2 数据模型定义 |
-| [../specs/002-advanced-capabilities/quickstart.md](../specs/002-advanced-capabilities/quickstart.md) | Phase 2 快速开始 |
-| [../specs/002-advanced-capabilities/contracts/](../specs/002-advanced-capabilities/contracts/) | Phase 2 接口合约（client/config/provider） |
-| [../README.md](../README.md) | 项目 README 中文快速入门 |
+| [../README.md](../README.md) | 项目 README — 完整中文使用说明 |
+| [../specs/001-custom-bridge-mvp/](../specs/001-custom-bridge-mvp/) | Phase 1 MVP（spec/plan/tasks/quickstart/contracts） |
+| [../specs/002-advanced-capabilities/](../specs/002-advanced-capabilities/) | Phase 2 高级能力（spec/plan/tasks/research/data-model/quickstart/contracts） |
+| [../specs/003-production-experience/spec.md](../specs/003-production-experience/spec.md) | Phase 3 生产级体验功能规格 |
+| [../specs/003-production-experience/plan.md](../specs/003-production-experience/plan.md) | Phase 3 实现计划 |
+| [../specs/003-production-experience/tasks.md](../specs/003-production-experience/tasks.md) | Phase 3 任务清单 |
+| [../specs/003-production-experience/research.md](../specs/003-production-experience/research.md) | Phase 3 技术研究 |
+| [../specs/003-production-experience/data-model.md](../specs/003-production-experience/data-model.md) | Phase 3 数据模型定义 |
+| [../specs/003-production-experience/quickstart.md](../specs/003-production-experience/quickstart.md) | Phase 3 快速开始 |
+| [../specs/003-production-experience/contracts/](../specs/003-production-experience/contracts/) | Phase 3 接口合约（client/config） |
+| [../specs/003-production-experience/checklists/](../specs/003-production-experience/checklists/) | Phase 3 质量检查清单 |

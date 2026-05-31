@@ -10,6 +10,8 @@ import { AuthManager } from '../auth';
 import { COMMAND_IDS } from '../consts';
 import { autoDetectModels } from '../provider/detect';
 import * as logger from '../logger';
+import { getDumpDirectoryUri } from '../logger';
+import { getI18nString } from '../i18n';
 
 /**
  * Set API Key 命令实现
@@ -18,7 +20,7 @@ async function handleSetApiKey(): Promise<void> {
 	try {
 		const endpoints = ConfigManager.getEndpoints();
 		if (endpoints.length === 0) {
-			void vscode.window.showWarningMessage('未配置任何端点，请先在 settings.json 中配置 copilot-custom-bridge.endpoints');
+			void vscode.window.showWarningMessage(getI18nString('NO_ENDPOINT_CONFIGURED'));
 			return;
 		}
 
@@ -30,7 +32,7 @@ async function handleSetApiKey(): Promise<void> {
 		}));
 
 		const selected = await vscode.window.showQuickPick(items, {
-			placeHolder: '选择要设置 API Key 的端点',
+			placeHolder: getI18nString('ENDPOINT_SELECT_PLACEHOLDER'),
 		});
 
 		if (!selected) { return; } // 用户取消
@@ -51,6 +53,8 @@ async function handleSetApiKey(): Promise<void> {
 		if (apiKey === undefined) { return; } // 用户取消
 
 		await AuthManager.setApiKey(selected.description, apiKey);
+		// Phase 3: trigger Walkthrough completion event (C1 fix)
+		await vscode.commands.executeCommand('setContext', 'copilot-custom-bridge:apiKeySet', true);
 		void vscode.window.showInformationMessage(`API Key 已设置: ${selected.label}`);
 	} catch (err) {
 		logger.error('Set API Key 命令失败', err);
@@ -159,12 +163,50 @@ async function handleDetectModels(): Promise<void> {
 }
 
 /**
+ * T014: Open Dump Directory 命令实现 (Phase 3)
+ */
+async function handleOpenDumpDirectory(): Promise<void> {
+	try {
+		const uri = getDumpDirectoryUri();
+		if (!uri) {
+			void vscode.window.showErrorMessage(getI18nString('DUMP_OPEN_FAILED'));
+			return;
+		}
+		await vscode.env.openExternal(uri);
+	} catch (err) {
+		logger.error('Open Dump Directory 命令失败', err);
+		void vscode.window.showErrorMessage(getI18nString('DUMP_OPEN_FAILED'));
+	}
+}
+
+/**
+ * T027: Getting Started 命令实现 (Phase 3)
+ */
+async function handleGettingStarted(): Promise<void> {
+	try {
+		await vscode.commands.executeCommand(
+			'workbench.action.openWalkthrough',
+			'copilot-custom-bridge#copilot-custom-bridge.getting-started'
+		);
+	} catch (err) {
+		logger.error('Getting Started 命令失败', err);
+		void vscode.window.showErrorMessage(getI18nString('WALKTHROUGH_OPEN_FAILED'));
+	}
+}
+
+/**
  * 注册所有命令
  */
 export function registerCommands(context: vscode.ExtensionContext): vscode.Disposable[] {
+	// Phase 3: 初始化上下文 keys (C2 fix)
+	const hasEndpoints = ConfigManager.getEndpoints().length > 0;
+	void vscode.commands.executeCommand('setContext', 'copilot-custom-bridge:endpointsConfigured', hasEndpoints);
+
 	return [
 		vscode.commands.registerCommand(COMMAND_IDS.SET_API_KEY, handleSetApiKey),
 		vscode.commands.registerCommand(COMMAND_IDS.CLEAR_API_KEY, handleClearApiKey),
 		vscode.commands.registerCommand(COMMAND_IDS.DETECT_MODELS, handleDetectModels),
+		vscode.commands.registerCommand('copilot-custom-bridge.openDumpDirectory', handleOpenDumpDirectory),
+		vscode.commands.registerCommand('copilot-custom-bridge.gettingStarted', handleGettingStarted),
 	];
 }
