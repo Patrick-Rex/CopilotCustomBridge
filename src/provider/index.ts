@@ -9,9 +9,14 @@ import { ConfigManager } from '../config';
 import { AuthManager } from '../auth';
 import { OpenAIClient } from '../client';
 import type { OpenAIChatRequest, StreamCallbacks, ClientError } from '../client';
-import { convertMessages } from './convert';
+import { convertMessages, extractDataParts } from './convert';
 import { estimateTotalTokens, compressAndTruncate } from './tokens';
-import { collectModels } from './models';
+import { collectModels, parseModelId, type ExtendedModelInfo } from './models';
+import { createStreamHandler } from './stream';
+import { buildChatRequest } from './request';
+import { convertVSCodeToolsToOpenAI } from './tools/request';
+import { findPreflightTools, getPreflightContextMessage, ToolCallLoopController } from './tools/flow';
+import { resolveImageMessages } from './vision';
 import { DEFAULT_TEMPERATURE } from '../types';
 import * as logger from '../logger';
 
@@ -43,10 +48,10 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 	}
 
 	/**
-	 * 提供模型选择器中的模型列表
+	 * 提供模型选择器中的模型列表 (Phase 2: 支持 agent 模式过滤)
 	 */
 	async provideLanguageModelChatInformation(
-		_options: vscode.PrepareLanguageModelChatModelOptions,
+		options: vscode.PrepareLanguageModelChatModelOptions,
 		_token: vscode.CancellationToken,
 	): Promise<vscode.LanguageModelChatInformation[]> {
 		try {
@@ -54,6 +59,10 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			if (endpoints.length === 0) {
 				return [];
 			}
+
+			// 检测 agent 模式
+			const opts = options as unknown as Record<string, unknown>;
+			const agentMode = !!(opts?.toolCalling || opts?.tools);
 
 			// 并行检查所有端点的 API Key 可用性
 			const availability = new Map<string, boolean>();
@@ -63,8 +72,9 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			});
 			await Promise.all(checks);
 
-			const models = collectModels(endpoints, availability);
-			logger.info(`模型列表已刷新: ${models.length} 个模型`);
+			// Phase 2: agent 模式时过滤 toolCalling: false 的模型
+			const models = collectModels(endpoints, availability, agentMode);
+			logger.info(`模型列表已刷新: ${models.length} 个模型 (agentMode=${agentMode})`);
 			return models;
 		} catch (err) {
 			logger.error('获取模型列表失败', err);
@@ -85,15 +95,14 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 		const modelId = model.id;
 
 		try {
-			// 1. 解析 modelId
-			const slashIndex = modelId.indexOf('/');
-			if (slashIndex === -1) {
+			// 1. 解析 modelId (Phase 2: 使用 parseModelId)
+			const parsed = parseModelId(modelId);
+			if (!parsed) {
 				this.reportError(progress, '无效的模型 ID 格式');
 				return;
 			}
 
-			const endpointId = modelId.substring(0, slashIndex);
-			const apiModelId = modelId.substring(slashIndex + 1);
+			const { endpointId, modelId: apiModelId } = parsed;
 
 			// 2. 获取端点和模型配置
 			const found = ConfigManager.getModelById(modelId);
@@ -102,16 +111,37 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 				return;
 			}
 
-			// 3. 获取 API Key
+			// 3. Phase 2: 获取完整能力（含两级解析）
+			const capabilities = ConfigManager.getModelCapability(endpointId, apiModelId);
+
+			// 3a. Phase 2: 工具预飞 (preflight)
+			let preflightContext: string | undefined;
+			if (options.tools && options.tools.length > 0) {
+				const preflightTools = findPreflightTools(options.tools);
+				if (preflightTools.length > 0) {
+					logger.info(`预热工具: ${preflightTools.length} 个`);
+					// 结果由 VS Code 管理，此处仅追踪状态
+				}
+			}
+
+			// 4. 获取 API Key
 			const apiKey = await AuthManager.getApiKey(endpointId);
 			if (!apiKey) {
 				this.reportError(progress, `请先为端点 "${found.endpoint.name}" 设置 API Key（命令: Set API Key）`);
 				return;
 			}
+		// 3b. Phase 2: 视觉处理 (T034)
+		const { resolvedMessages } = await resolveImageMessages(
+			messages as vscode.LanguageModelChatRequestMessage[],
+			endpointId,
+			apiModelId,
+			capabilities.imageInput ?? false,
+			token,
+		);
 
-			// 4. 消息转换
-			let openaiMessages = convertMessages(messages as vscode.LanguageModelChatRequestMessage[]);
-			if (openaiMessages.length === 0) {
+		// 4. 消息转换
+		let openaiMessages = convertMessages(resolvedMessages);
+		if (openaiMessages.length === 0) {
 				this.reportError(progress, '消息转换后为空');
 				return;
 			}
@@ -127,30 +157,48 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			// 6. 获取 Max Output Tokens
 			const maxOutputTokens = ConfigManager.getMaxTokens() ?? found.model.maxOutputTokens ?? 4096;
 
-			// 7. 构建请求并发送
+			// 7. Phase 2: 构建请求（使用 buildChatRequest）
 			const proxy = vscode.workspace.getConfiguration('http').get<string>('proxy');
 			const client = new OpenAIClient(found.endpoint.baseUrl, apiKey, {
 				proxy: proxy || undefined,
 			});
 
-			const request: OpenAIChatRequest = {
+			// 工具转换 — toolCalling: true=不限制, false=不传工具, number=上限
+			const toolLimit = capabilities.toolCalling === true ? undefined
+				: capabilities.toolCalling === false ? false
+				: capabilities.toolCalling;
+			const tools = options.tools
+				? convertVSCodeToolsToOpenAI(options.tools, toolLimit)
+				: undefined;
+
+			// 推理力度
+			const thinkingEffort = ConfigManager.getThinkingEffort(endpointId, apiModelId);
+
+			// 模型 ID 覆盖
+			const modelIdOverride = ConfigManager.getModelIdOverride(apiModelId);
+
+			const request = buildChatRequest({
 				model: apiModelId,
 				messages: openaiMessages,
-				stream: true,
-				temperature: DEFAULT_TEMPERATURE,
-				max_tokens: maxOutputTokens,
-			};
+				maxTokens: maxOutputTokens,
+				tools,
+				reasoningEffort: thinkingEffort,
+				modelIdOverride,
+			});
 
+			// Phase 2: 使用 createStreamHandler
+			const streamHandler = createStreamHandler(progress);
 			const callbacks: StreamCallbacks = {
-				onContent: (text: string) => {
-					progress.report(new vscode.LanguageModelTextPart(text));
-				},
+				onContent: streamHandler.onContent,
+				onThinking: streamHandler.onThinking,
+				onToolCall: streamHandler.onToolCall,
 				onError: (error: ClientError) => {
 					const msg = this.formatErrorMessage(error, found.endpoint.name);
 					progress.report(new vscode.LanguageModelTextPart(msg));
 				},
 				onDone: (_usage) => {
-					// 流完成（Copilot Chat 自动处理结束）
+					streamHandler.flushToolCalls();
+					streamHandler.onComplete();
 				},
 			};
 

@@ -9,13 +9,31 @@
 // 模型能力声明（Phase 1 接受配置但忽略非文本能力）
 // ============================================================================
 
+// ============================================================================
+// Thinking 推理力度枚举 (Phase 2)
+// ============================================================================
+
+export type ThinkingEffort = 'none' | 'low' | 'high' | 'max';
+
+export const THINKING_EFFORT_VALUES: readonly ThinkingEffort[] = ['none', 'low', 'high', 'max'] as const;
+
+export const THINKING_EFFORT_DEFAULT: ThinkingEffort = 'none';
+
+// ============================================================================
+// 模型能力声明 (Phase 2 全面生效)
+// ============================================================================
+
 export interface ModelCapabilities {
-	/** 工具调用能力，boolean 或版本号（Phase 1 忽略） */
+	/** 工具调用能力，false=不支持, true=支持无上限, number=工具数量上限 */
 	readonly toolCalling?: boolean | number;
-	/** 图像输入能力（Phase 1 忽略） */
+	/** 图像输入能力 */
 	readonly imageInput?: boolean;
-	/** 思考模式（Phase 1 忽略） */
+	/** 思考模式 */
 	readonly thinking?: boolean;
+	/** 覆盖端点级视觉代理模型 ID (Phase 2) */
+	readonly visionProxy?: string;
+	/** 覆盖端点级推理力度 (Phase 2) */
+	readonly thinkingEffort?: ThinkingEffort;
 }
 
 // ============================================================================
@@ -52,8 +70,12 @@ export interface EndpointConfig {
 	readonly baseUrl: string;
 	/** 模型列表 */
 	readonly models: ModelConfig[];
-	/** 额外请求头（Phase 1 接受但暂不实现发送） */
+	/** 额外请求头 */
 	readonly defaultHeaders?: Record<string, string>;
+	/** 默认视觉代理模型 ID (Phase 2) */
+	readonly visionProxy?: string;
+	/** 默认推理力度 (Phase 2) */
+	readonly defaultThinkingEffort?: ThinkingEffort;
 }
 
 // ============================================================================
@@ -77,6 +99,48 @@ export interface BridgeConfig {
 	readonly modelIdOverrides?: Record<string, string>;
 	/** 全局最大输出 token */
 	readonly maxTokens?: number;
+}
+
+// ============================================================================
+// 视觉代理类型 (Phase 2)
+// ============================================================================
+
+export interface VisionProxyConfig {
+	/** 代理模型 ID */
+	readonly modelId: string;
+	/** 来源端点 ID */
+	readonly sourceEndpointId: string;
+}
+
+export interface VisionProxyResult {
+	/** 原始图片在消息中的位置索引 */
+	readonly originalImageIndex: number;
+	/** 视觉代理生成的文本描述 */
+	readonly description: string;
+	/** 代理模型 ID */
+	readonly sourceModelId: string;
+	/** 处理耗时 (ms) */
+	readonly processingTimeMs: number;
+}
+
+// ============================================================================
+// 自动探测类型 (Phase 2)
+// ============================================================================
+
+export interface AutoDetectedModel {
+	/** 模型 ID（来自 API 响应） */
+	readonly id: string;
+	/** 能力声明 */
+	readonly capabilities: ModelCapabilities;
+	/** 来源端点 ID */
+	readonly sourceEndpointId: string;
+	/** 探测时间戳 */
+	readonly detectedAt: Date;
+}
+
+export interface ModelCacheEntry {
+	models: ModelConfig[];
+	timestamp: number;
 }
 
 // ============================================================================

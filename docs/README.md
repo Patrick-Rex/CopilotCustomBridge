@@ -40,4 +40,11 @@ docs/
 | [../specs/001-custom-bridge-mvp/tasks.md](../specs/001-custom-bridge-mvp/tasks.md) | Phase 1 MVP 任务清单 |
 | [../specs/001-custom-bridge-mvp/quickstart.md](../specs/001-custom-bridge-mvp/quickstart.md) | 中文快速入门 |
 | [../specs/001-custom-bridge-mvp/contracts/](../specs/001-custom-bridge-mvp/contracts/) | 接口合约（provider/client/config） |
+| [../specs/002-advanced-capabilities/spec.md](../specs/002-advanced-capabilities/spec.md) | Phase 2 高级能力功能规格 |
+| [../specs/002-advanced-capabilities/plan.md](../specs/002-advanced-capabilities/plan.md) | Phase 2 高级能力实现计划 |
+| [../specs/002-advanced-capabilities/tasks.md](../specs/002-advanced-capabilities/tasks.md) | Phase 2 高级能力任务清单 |
+| [../specs/002-advanced-capabilities/research.md](../specs/002-advanced-capabilities/research.md) | Phase 2 技术研究 |
+| [../specs/002-advanced-capabilities/data-model.md](../specs/002-advanced-capabilities/data-model.md) | Phase 2 数据模型定义 |
+| [../specs/002-advanced-capabilities/quickstart.md](../specs/002-advanced-capabilities/quickstart.md) | Phase 2 快速开始 |
+| [../specs/002-advanced-capabilities/contracts/](../specs/002-advanced-capabilities/contracts/) | Phase 2 接口合约（client/config/provider） |
 | [../README.md](../README.md) | 项目 README 中文快速入门 |

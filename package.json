@@ -31,6 +31,11 @@
         "command": "copilot-custom-bridge.clearApiKey",
         "title": "Clear API Key",
         "category": "Copilot Custom Bridge"
+      },
+      {
+        "command": "copilot-custom-bridge.detectModels",
+        "title": "Auto-detect Models",
+        "category": "Copilot Custom Bridge"
       }
     ],
     "configuration": {
@@ -66,10 +71,24 @@
                 "type": "object",
                 "description": "额外请求头（可选）"
               },
+              "visionProxy": {
+                "type": "string",
+                "description": "默认视觉代理模型 ID（Phase 2）"
+              },
+              "defaultThinkingEffort": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "high",
+                  "max"
+                ],
+                "description": "默认推理力度（Phase 2）"
+              },
               "models": {
                 "type": "array",
-                "minItems": 1,
-                "description": "模型列表",
+                "minItems": 0,
+                "description": "模型列表（Phase 2: 可为空，配合自动探测）",
                 "items": {
                   "type": "object",
                   "required": [
@@ -120,6 +139,20 @@
                         "thinking": {
                           "type": "boolean",
                           "default": false
+                        },
+                        "visionProxy": {
+                          "type": "string",
+                          "description": "覆盖端点级视觉代理模型 ID（Phase 2）"
+                        },
+                        "thinkingEffort": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "high",
+                            "max"
+                          ],
+                          "description": "覆盖端点级推理力度（Phase 2）"
                         }
                       }
                     }

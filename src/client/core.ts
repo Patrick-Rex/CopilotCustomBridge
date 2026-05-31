@@ -13,7 +13,7 @@ import type {
 	ClientError,
 	TokenUsage,
 } from './types';
-import { SSE_DONE, HTTP_CONFIG, RETRY_CONFIG } from '../consts';
+import { SSE_DONE, HTTP_CONFIG, RETRY_CONFIG, RATE_LIMIT_MAX_RETRIES, RATE_LIMIT_MAX_WAIT_SEC } from '../consts';
 import * as logger from '../logger';
 
 /** 指数退避延迟 */
@@ -26,7 +26,23 @@ function retryDelay(attempt: number): number {
 
 /** 判断错误是否可重试 */
 function isRetryable(error: ClientError): boolean {
-	return error.type === 'server' || error.type === 'network';
+	return error.type === 'server' || error.type === 'network' || error.type === 'rate_limit';
+}
+
+/**
+ * Phase 2: 解析 Retry-After 头（支持秒数和 HTTP-date 格式）
+ */
+function parseRetryAfter(header: string | null): number | null {
+	if (!header) { return null; }
+	// 尝试解析为秒数
+	const seconds = parseInt(header, 10);
+	if (!isNaN(seconds)) { return seconds; }
+	// 尝试解析为 HTTP-date
+	const date = new Date(header);
+	if (!isNaN(date.getTime())) {
+		return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000));
+	}
+	return null;
 }
 
 /** 根据 HTTP 状态码分类错误 */
@@ -89,12 +105,29 @@ async function parseSSEStream(
 						const jsonStr = trimmed.slice(6);
 						const chunk = JSON.parse(jsonStr) as Record<string, unknown>;
 
-						// 提取 delta.content
+						// 提取 delta
 						const choices = chunk?.choices as Array<Record<string, unknown>> | undefined;
 						if (choices && choices.length > 0) {
 							const delta = choices[0].delta as Record<string, unknown> | undefined;
-							if (delta?.content && typeof delta.content === 'string') {
-								callbacks.onContent(delta.content);
+							if (delta) {
+								// delta.content
+								if (delta.content && typeof delta.content === 'string') {
+									callbacks.onContent(delta.content);
+								}
+								// Phase 2: delta.reasoning_content
+								if (delta.reasoning_content && typeof delta.reasoning_content === 'string' && callbacks.onThinking) {
+									callbacks.onThinking(delta.reasoning_content);
+								}
+								// Phase 2: delta.tool_calls
+								if (delta.tool_calls && Array.isArray(delta.tool_calls) && callbacks.onToolCall) {
+									for (const tc of delta.tool_calls as Array<Record<string, unknown>>) {
+										callbacks.onToolCall({
+											index: typeof tc.index === 'number' ? tc.index : 0,
+											id: typeof tc.id === 'string' ? tc.id : undefined,
+											function: tc.function as Record<string, unknown> | undefined,
+										});
+									}
+								}
 							}
 						}
 
@@ -205,6 +238,24 @@ class OpenAIClientImpl {
 						} catch { /* ignore */ }
 
 						const error: ClientError = classifyError(response.status, errorBody || `HTTP ${response.status}`);
+						error.retryable = isRetryable(error);
+
+						// Phase 2: 429 特殊处理 — Retry-After 退避
+						if (error.type === 'rate_limit' && attempt < RATE_LIMIT_MAX_RETRIES) {
+							const retryAfter = parseRetryAfter(response.headers.get('Retry-After'));
+							if (retryAfter !== null && retryAfter > RATE_LIMIT_MAX_WAIT_SEC) {
+								logger.warn(`Retry-After > ${RATE_LIMIT_MAX_WAIT_SEC}s, 放弃重试`);
+								callbacks.onError(error);
+								return;
+							}
+							const delay = retryAfter !== null
+								? retryAfter * 1000
+								: retryDelay(attempt);
+							logger.warn(`429 限速（重试 ${attempt + 1}/${RATE_LIMIT_MAX_RETRIES}），等待 ${delay}ms`);
+							lastError = error;
+							await new Promise(resolve => setTimeout(resolve, delay));
+							continue;
+						}
 
 						if (attempt < RETRY_CONFIG.MAX_RETRIES && isRetryable(error)) {
 							logger.warn(`请求失败（可重试 ${attempt + 1}/${RETRY_CONFIG.MAX_RETRIES}）: ${error.type} ${error.statusCode}`);
@@ -260,6 +311,86 @@ class OpenAIClientImpl {
 			callbacks.onError(lastError);
 		}
 	}
+
+	/**
+	 * Phase 2: 非流式聊天补全（视觉代理用）
+	 */
+	async chatCompletion(
+		request: OpenAIChatRequest,
+		cancelToken?: vscode.CancellationToken,
+	): Promise<string> {
+		const url = `${this.baseUrl}${HTTP_CONFIG.CHAT_PATH}`;
+
+		const controller = new AbortController();
+		const cancelListener = cancelToken
+			? cancelToken.onCancellationRequested(() => controller.abort())
+			: undefined;
+
+		try {
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
+					'Authorization': `Bearer ${this.apiKey}`,
+				},
+				body: JSON.stringify({
+					model: request.model,
+					messages: request.messages,
+					stream: false,
+					max_tokens: request.max_tokens ?? 1024,
+				}),
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(`HTTP ${response.status}: ${errorBody}`);
+			}
+
+			const data = await response.json() as Record<string, unknown>;
+			const choices = data?.choices as Array<Record<string, unknown>> | undefined;
+			if (choices && choices.length > 0) {
+				const message = choices[0].message as Record<string, unknown> | undefined;
+				if (message?.content && typeof message.content === 'string') {
+					return message.content;
+				}
+			}
+			throw new Error('响应中无有效内容');
+		} finally {
+			cancelListener?.dispose();
+		}
+	}
+
+	/**
+	 * Phase 2: 列出可用模型（自动探测用）
+	 */
+	async listModels(cancelToken?: vscode.CancellationToken): Promise<unknown> {
+		const url = `${this.baseUrl}/models`;
+
+		const controller = new AbortController();
+		const cancelListener = cancelToken
+			? cancelToken.onCancellationRequested(() => controller.abort())
+			: undefined;
+
+		try {
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${this.apiKey}`,
+				},
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(`HTTP ${response.status}: ${errorBody}`);
+			}
+
+			return await response.json();
+		} finally {
+			cancelListener?.dispose();
+		}
+	}
 }
 
-export { OpenAIClientImpl as OpenAIClient };
+export const OpenAIClient = OpenAIClientImpl;
