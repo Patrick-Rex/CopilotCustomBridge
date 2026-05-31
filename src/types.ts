@@ -70,8 +70,10 @@ export interface EndpointConfig {
 	readonly baseUrl: string;
 	/** 模型列表 */
 	readonly models: ModelConfig[];
-	/** 额外请求头 */
+	/** 额外请求头（值从 SecretStorage 获取的敏感 header 应使用 authHeader 代替） */
 	readonly defaultHeaders?: Record<string, string>;
+	/** 自定义认证头名称（如 X-Api-Key），Key 值自动从 SecretStorage 读取 */
+	readonly authHeader?: string;
 	/** 默认视觉代理模型 ID (Phase 2) */
 	readonly visionProxy?: string;
 	/** 默认推理力度 (Phase 2) */

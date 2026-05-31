@@ -10,7 +10,13 @@
     "type": "git",
     "url": "https://github.com/Patrick-Rex/CopilotCustomBridge"
   },
-  "keywords": ["copilot", "openai", "custom-model", "chat", "bridge"],
+  "keywords": [
+    "copilot",
+    "openai",
+    "custom-model",
+    "chat",
+    "bridge"
+  ],
   "galleryBanner": {
     "color": "#1e1e1e",
     "theme": "dark"
@@ -52,6 +58,12 @@
         "command": "copilot-custom-bridge.gettingStarted",
         "title": "%command.gettingStarted%",
         "category": "Copilot Custom Bridge"
+      }
+    ],
+    "languageModelChatProviders": [
+      {
+        "vendor": "copilot-custom-bridge",
+        "displayName": "Copilot Custom Bridge"
       }
     ],
     "configuration": {
@@ -220,22 +232,34 @@
             "id": "configureEndpoint",
             "title": "%walkthrough.step1.title%",
             "description": "%walkthrough.step1.description%",
-            "media": { "markdown": "resources/walkthrough/step1-endpoint.md" },
-            "completionEvents": ["onCommand:workbench.action.openSettingsJson"]
+            "media": {
+              "markdown": "resources/walkthrough/step1-endpoint.md"
+            },
+            "completionEvents": [
+              "onCommand:workbench.action.openSettingsJson"
+            ]
           },
           {
             "id": "setApiKey",
             "title": "%walkthrough.step2.title%",
             "description": "%walkthrough.step2.description%",
-            "media": { "markdown": "resources/walkthrough/step2-apikey.md" },
-            "completionEvents": ["copilot-custom-bridge:apiKeySet"]
+            "media": {
+              "markdown": "resources/walkthrough/step2-apikey.md"
+            },
+            "completionEvents": [
+              "copilot-custom-bridge:apiKeySet"
+            ]
           },
           {
             "id": "switchModel",
             "title": "%walkthrough.step3.title%",
             "description": "%walkthrough.step3.description%",
-            "media": { "markdown": "resources/walkthrough/step3-model.md" },
-            "completionEvents": ["onCommand:workbench.action.chat.open"]
+            "media": {
+              "markdown": "resources/walkthrough/step3-model.md"
+            },
+            "completionEvents": [
+              "onCommand:workbench.action.chat.open"
+            ]
           }
         ]
       }
@@ -245,16 +269,19 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/mocha": "^10.0.0",
     "@types/node": "18.x",
     "@types/vscode": "^1.85.0",
     "@vscode/test-electron": "^2.3.0",
     "@vscode/vsce": "^3.9.1",
+    "eslint": "^10.4.1",
     "mocha": "^10.2.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.60.0"
   }
 }

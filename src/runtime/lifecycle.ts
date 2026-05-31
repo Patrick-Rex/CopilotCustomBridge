@@ -10,20 +10,21 @@ import { ConfigManager } from '../config';
 import { AuthManager } from '../auth';
 import { registerCommands } from './commands';
 import { registerProvider } from './provider';
-import { setDebugMode, dispose as disposeLogger, initDumpSystem } from '../logger';
+import { setDebugMode, dispose as disposeLogger, initDumpSystem, initChannel } from '../logger';
 import * as logger from '../logger';
 
 /**
  * 扩展激活入口
  */
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	try {
 		// 初始化 AuthManager（注入 ExtensionContext）
 		AuthManager.init(context);
 
-		// 设置日志级别
+		// 设置日志级别 & 初始化输出通道（确保 Output 面板始终可见）
 		const debugMode = ConfigManager.getDebugMode();
 		setDebugMode(debugMode);
+		initChannel();
 		initDumpSystem(context); // Phase 3: 初始化转储系统
 		logger.info(`Copilot Custom Bridge 启动 (debugMode=${debugMode})`);
 
@@ -32,8 +33,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		context.subscriptions.push(...cmdDisposables);
 		logger.info('命令已注册');
 
-		// 注册 LanguageModelChatProvider
-		registerProvider(context);
+		// 注册 LanguageModelChatProvider（异步：需等待 Copilot Chat 激活）
+		await registerProvider(context);
 
 		// 清理
 		context.subscriptions.push({

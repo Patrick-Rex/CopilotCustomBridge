@@ -23,7 +23,7 @@ npm install
 npm run compile
 
 # 或从 .vsix 安装
-code --install-extension copilot-custom-bridge-0.1.0.vsix
+code --install-extension copilot-custom-bridge-0.0.1.vsix
 ```
 
 ### 2. 配置端点

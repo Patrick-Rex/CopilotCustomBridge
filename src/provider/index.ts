@@ -8,16 +8,16 @@ import * as vscode from 'vscode';
 import { ConfigManager } from '../config';
 import { AuthManager } from '../auth';
 import { OpenAIClient } from '../client';
-import type { OpenAIChatRequest, StreamCallbacks, ClientError } from '../client';
-import { convertMessages, extractDataParts } from './convert';
+import type { StreamCallbacks, ClientError } from '../client';
+import { convertMessages } from './convert';
 import { estimateTotalTokens, compressAndTruncate } from './tokens';
-import { collectModels, parseModelId, type ExtendedModelInfo } from './models';
+import { collectModels, parseModelId } from './models';
 import { createStreamHandler } from './stream';
 import { buildChatRequest } from './request';
 import { convertVSCodeToolsToOpenAI } from './tools/request';
-import { findPreflightTools, getPreflightContextMessage, ToolCallLoopController } from './tools/flow';
+import { findPreflightTools } from './tools/flow';
 import { resolveImageMessages } from './vision';
-import { DEFAULT_TEMPERATURE } from '../types';
+
 import * as logger from '../logger';
 
 /**
@@ -115,21 +115,20 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			const capabilities = ConfigManager.getModelCapability(endpointId, apiModelId);
 
 			// 3a. Phase 2: 工具预飞 (preflight)
-			let preflightContext: string | undefined;
-			if (options.tools && options.tools.length > 0) {
-				const preflightTools = findPreflightTools(options.tools);
-				if (preflightTools.length > 0) {
-					logger.info(`预热工具: ${preflightTools.length} 个`);
-					// 结果由 VS Code 管理，此处仅追踪状态
-				}
+		if (options.tools && options.tools.length > 0) {
+			const preflightTools = findPreflightTools(options.tools);
+			if (preflightTools.length > 0) {
+				logger.info(`预热工具: ${preflightTools.length} 个`);
+				// 结果由 VS Code 管理，此处仅追踪状态
 			}
+		}
 
-			// 4. 获取 API Key
-			const apiKey = await AuthManager.getApiKey(endpointId);
-			if (!apiKey) {
-				this.reportError(progress, `请先为端点 "${found.endpoint.name}" 设置 API Key（命令: Set API Key）`);
-				return;
-			}
+		// 4. 获取 API Key
+		const apiKey = await AuthManager.getApiKey(endpointId);
+		if (!apiKey) {
+			this.reportError(progress, `请先为端点 "${found.endpoint.name}" 设置 API Key（命令: Set API Key）`);
+			return;
+		}
 		// 3b. Phase 2: 视觉处理 (T034)
 		const { resolvedMessages } = await resolveImageMessages(
 			messages as vscode.LanguageModelChatRequestMessage[],
@@ -142,7 +141,6 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 		// 4. 消息转换
 		let openaiMessages = convertMessages(resolvedMessages);
 		if (openaiMessages.length === 0) {
-				this.reportError(progress, '消息转换后为空');
 				return;
 			}
 
@@ -247,6 +245,11 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			default:
 				return `❌ ${error.message}`;
 		}
+	}
+
+	/** 强制 Copilot Chat 刷新模型选择器 */
+	refreshModelPicker(): void {
+		this._onDidChange.fire();
 	}
 
 	/** 释放资源 */

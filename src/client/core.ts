@@ -181,6 +181,18 @@ class OpenAIClientImpl {
 		this.options = options;
 	}
 
+	/** 构建统一的请求头（defaultHeaders + 自定义 authHeader） */
+	private _buildHeaders(): Record<string, string> {
+		const headers: Record<string, string> = {
+			...this.options.defaultHeaders,
+			'Authorization': `Bearer ${this.apiKey}`,
+		};
+		if (this.options.authHeader && this.options.authHeader !== 'Authorization') {
+			headers[this.options.authHeader] = this.apiKey;
+		}
+		return headers;
+	}
+
 	/**
 	 * 发起 SSE 流式聊天请求（含重试逻辑）
 	 */
@@ -200,23 +212,33 @@ class OpenAIClientImpl {
 				const url = `${this.baseUrl}${HTTP_CONFIG.CHAT_PATH}`;
 				const startTime = Date.now();
 
-				// T010: 构建请求体为变量以便转储
-				const requestBody = {
+				// 构建请求体
+				const requestBody: Record<string, unknown> = {
 					model: request.model,
 					messages: request.messages,
 					stream: true,
 					temperature: request.temperature ?? 0.7,
 					max_tokens: request.max_tokens,
 				};
+				if (request.tools?.length) { requestBody.tools = request.tools; }
+				if (request.tool_choice) { requestBody.tool_choice = request.tool_choice; }
+				if (request.reasoning_effort && request.reasoning_effort !== 'none') {
+					requestBody.reasoning_effort = request.reasoning_effort;
+				}
 				const bodyJson = JSON.stringify(requestBody);
 
-				// 构建 fetch 选项
+			// 构建 fetch 选项（合并端点级 defaultHeaders + 自定义认证头）
+			const mergedHeaders: Record<string, string> = {
+				...this.options.defaultHeaders,
+				'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
+				'Authorization': `Bearer ${this.apiKey}`,
+			};
+			if (this.options.authHeader && this.options.authHeader !== 'Authorization') {
+				mergedHeaders[this.options.authHeader] = this.apiKey;
+			}
 				const fetchInit: RequestInit & { dispatcher?: unknown } = {
 					method: 'POST',
-					headers: {
-						'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
-						'Authorization': `Bearer ${this.apiKey}`,
-					},
+					headers: mergedHeaders,
 					body: bodyJson,
 				};
 
@@ -373,10 +395,7 @@ class OpenAIClientImpl {
 		try {
 			const response = await fetch(url, {
 				method: 'POST',
-				headers: {
-					'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
-					'Authorization': `Bearer ${this.apiKey}`,
-				},
+				headers: this._buildHeaders(),
 				body: JSON.stringify({
 					model: request.model,
 					messages: request.messages,
@@ -419,9 +438,7 @@ class OpenAIClientImpl {
 		try {
 			const response = await fetch(url, {
 				method: 'GET',
-				headers: {
-					'Authorization': `Bearer ${this.apiKey}`,
-				},
+				headers: this._buildHeaders(),
 				signal: controller.signal,
 			});
 

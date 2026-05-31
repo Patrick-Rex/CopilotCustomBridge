@@ -68,8 +68,7 @@ export async function resolveImageMessages(
 			const client = new OpenAIClient(endpoint.baseUrl, apiKey);
 			const descriptions: string[] = [];
 
-			for (const dp of dataParts) {
-				const base64 = bufferToBase64(dp.data);
+			for (let j = 0; j < dataParts.length; j++) {
 				const desc = await client.chatCompletion({
 					model: proxyModelId,
 					messages: [
@@ -98,14 +97,6 @@ export async function resolveImageMessages(
 	}
 
 	return { resolvedMessages: resolved, proxyResults };
-}
-
-function bufferToBase64(buffer: Uint8Array): string {
-	let binary = '';
-	for (let i = 0; i < buffer.length; i++) {
-		binary += String.fromCharCode(buffer[i]);
-	}
-	return btoa(binary);
 }
 
 function createFallbackMessage(

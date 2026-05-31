@@ -18,6 +18,22 @@ function rawConfig(): vscode.WorkspaceConfiguration {
 	return vscode.workspace.getConfiguration(CONFIG_SECTION);
 }
 
+/** 规范化用户配置的能力字段（兼容 toolCalls→toolCalling 等别名） */
+function normalizeCapabilities(raw: Record<string, unknown> | undefined): ModelConfig['capabilities'] {
+	if (!raw || typeof raw !== 'object') { return undefined; }
+	const caps: Record<string, unknown> = { ...raw };
+
+	// 兼容别名: toolCalls → toolCalling
+	if ('toolCalls' in caps && !('toolCalling' in caps)) {
+		caps.toolCalling = caps.toolCalls;
+	}
+	// 过滤掉不支持的能力字段
+	delete caps.toolCalls;
+	delete caps.streaming;
+
+	return caps as ModelConfig['capabilities'];
+}
+
 /** 校验单个 EndpointConfig */
 function validateEndpoint(ep: unknown, index: number): EndpointConfig | undefined {
 	const e = ep as Record<string, unknown>;
@@ -79,7 +95,7 @@ function validateEndpoint(ep: unknown, index: number): EndpointConfig | undefine
 			version: typeof m?.version === 'string' ? m.version : undefined,
 			maxInputTokens: maxInput,
 			maxOutputTokens: maxOutput,
-			capabilities: m?.capabilities as ModelConfig['capabilities'],
+			capabilities: normalizeCapabilities(m?.capabilities as Record<string, unknown> | undefined),
 		});
 	}
 
@@ -95,8 +111,7 @@ function validateEndpoint(ep: unknown, index: number): EndpointConfig | undefine
 		models: validModels,
 		defaultHeaders: typeof e?.defaultHeaders === 'object' && e.defaultHeaders
 			? e.defaultHeaders as Record<string, string>
-			: undefined,
-		visionProxy: typeof e?.visionProxy === 'string' ? e.visionProxy : undefined,
+			: undefined,		authHeader: typeof e?.authHeader === 'string' ? e.authHeader : undefined,		visionProxy: typeof e?.visionProxy === 'string' ? e.visionProxy : undefined,
 		defaultThinkingEffort: typeof e?.defaultThinkingEffort === 'string'
 			? e.defaultThinkingEffort as ThinkingEffort
 			: undefined,
@@ -153,15 +168,15 @@ class ConfigManagerImpl {
 		}
 	}
 
-	/** 根据完整模型 ID 查找端点和模型 */
+	/** 根据完整模型 ID 查找端点和模型（支持 __ 分隔符） */
 	getModelById(fullModelId: string): { endpoint: EndpointConfig; model: ModelConfig } | undefined {
-		const slashIndex = fullModelId.indexOf('/');
-		if (slashIndex === -1) {
+		const sepIndex = fullModelId.indexOf('__');
+		if (sepIndex === -1) {
 			return undefined;
 		}
 
-		const endpointId = fullModelId.substring(0, slashIndex);
-		const modelId = fullModelId.substring(slashIndex + 1);
+		const endpointId = fullModelId.substring(0, sepIndex);
+		const modelId = fullModelId.substring(sepIndex + 2);
 
 		for (const ep of this.getEndpoints()) {
 			if (ep.id !== endpointId) { continue; }

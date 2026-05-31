@@ -5,7 +5,7 @@
  */
 
 import * as vscode from 'vscode';
-import type { OpenAIToolCallDelta, OpenAIToolCall } from '../client/types';
+import type { OpenAIToolCallDelta } from '../client/types';
 import * as logger from '../logger';
 
 interface ToolCallAccumulator {

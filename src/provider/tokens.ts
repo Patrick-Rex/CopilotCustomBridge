@@ -10,7 +10,6 @@ import * as logger from '../logger';
 
 /** 字符/token 换算比例 */
 const CHARS_PER_TOKEN_EN = 4;
-const CHARS_PER_TOKEN_ZH = 1;
 
 /** 判断是否为中文字符（含 CJK 统一表意文字） */
 function isCJK(char: string): boolean {
@@ -88,14 +87,13 @@ export function compressAndTruncate(
 	const systemMessages = messages.filter(m => m.role === 'system');
 	const otherMessages = messages.filter(m => m.role !== 'system');
 
-	let result: OpenAIMessage[] = [];
 	let currentTokens = 0;
 
 	// 先加入 system 消息
 	for (const sys of systemMessages) {
 		currentTokens += estimateTokens(sys);
 	}
-	result = [...systemMessages];
+	let result: OpenAIMessage[] = [...systemMessages];
 
 	if (currentTokens > maxInputTokens * 0.5) {
 		// system 消息本身已超过一半限额，只保留第一条

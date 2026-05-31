@@ -197,7 +197,7 @@ async function handleGettingStarted(): Promise<void> {
 /**
  * 注册所有命令
  */
-export function registerCommands(context: vscode.ExtensionContext): vscode.Disposable[] {
+export function registerCommands(_context: vscode.ExtensionContext): vscode.Disposable[] {
 	// Phase 3: 初始化上下文 keys (C2 fix)
 	const hasEndpoints = ConfigManager.getEndpoints().length > 0;
 	void vscode.commands.executeCommand('setContext', 'copilot-custom-bridge:endpointsConfigured', hasEndpoints);

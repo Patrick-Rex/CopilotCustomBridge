@@ -6,7 +6,6 @@
 
 import * as vscode from 'vscode';
 import type { OpenAITool } from '../../client/types';
-import { DEFAULT_MAX_TOOLS } from './consts';
 import * as logger from '../../logger';
 
 /**

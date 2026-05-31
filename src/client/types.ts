@@ -141,6 +141,7 @@ export interface StreamDumpPayload {
 
 export interface ClientOptions {
 	defaultHeaders?: Record<string, string>;
+	authHeader?: string;
 	proxy?: string;
 }
 

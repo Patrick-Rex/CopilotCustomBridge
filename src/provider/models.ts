@@ -2,6 +2,9 @@
  * 模型映射模块 — ModelConfig → vscode.LanguageModelChatInformation (Phase 2 扩展)
  *
  * 合约见 specs/002-advanced-capabilities/contracts/provider.md
+ *
+ * NOTE: Copilot Chat 对模型对象有严格的字段解析，非标准字段可能被拒绝。
+ * 路由信息（endpointId / modelId）通过 ModelRouter Map 存储，不嵌入模型对象。
  */
 
 import * as vscode from 'vscode';
@@ -9,45 +12,55 @@ import type { EndpointConfig, ModelConfig } from '../types';
 import { DEFAULT_VERSION } from '../consts';
 import * as logger from '../logger';
 
-/** 扩展的 VS Code 模型信息（含内部元数据） */
-export interface ExtendedModelInfo extends vscode.LanguageModelChatInformation {
-	/** 端点 ID（内部路由用） */
-	readonly _endpointId: string;
-	/** 原始模型 ID（内部路由用） */
-	readonly _modelId: string;
-	/** 工具调用能力（agent 模式过滤用） */
-	readonly _toolCalling: boolean | number;
-	/** API Key 是否已配置 */
-	readonly _hasApiKey: boolean;
+/** 模型路由信息：模型 ID → 端点/模型映射 */
+class ModelRouter {
+	private readonly _map = new Map<string, { endpointId: string; modelId: string }>();
+
+	set(modelId: string, endpointId: string, apiModelId: string): void {
+		this._map.set(modelId, { endpointId, modelId: apiModelId });
+	}
+
+	get(modelId: string): { endpointId: string; modelId: string } | undefined {
+		return this._map.get(modelId);
+	}
 }
 
+/** 全局路由表 */
+export const modelRouter = new ModelRouter();
+
 /**
- * 将 EndpointConfig + ModelConfig 映射为 VS Code 模型信息 (Phase 2 扩展)
+ * 将 EndpointConfig + ModelConfig 映射为 VS Code 模型信息
+ *
+ * 仅返回 VS Code 标准字段 + isUserSelectable/statusIcon（Copilot Chat 非公开字段）。
+ * 路由信息存入 modelRouter，不混入模型对象。
  */
 export function toLanguageModelChatInformation(
 	endpoint: EndpointConfig,
 	model: ModelConfig,
 	hasApiKey: boolean,
-): ExtendedModelInfo {
+): vscode.LanguageModelChatInformation {
 	const caps = model.capabilities ?? {};
+	const modelId = `${endpoint.id}__${model.id}`;
+
+	// 注册路由信息
+	modelRouter.set(modelId, endpoint.id, model.id);
 
 	return {
-		id: `${endpoint.id}/${model.id}`,
+		id: modelId,
 		name: model.name,
-		family: model.family || endpoint.name,
+		family: 'copilot-custom-bridge',
 		version: model.version || DEFAULT_VERSION,
+		detail: hasApiKey ? `${endpoint.name} / ${model.name}` : '⚠️ 请先设置 API Key',
+		tooltip: hasApiKey ? undefined : '未配置 API Key，模型不可用',
 		maxInputTokens: model.maxInputTokens ?? 4096,
 		maxOutputTokens: model.maxOutputTokens ?? 4096,
+		isUserSelectable: true,
+		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
 		capabilities: {
 			imageInput: caps.imageInput ?? false,
 			toolCalling: caps.toolCalling ?? false,
 		},
-		// Phase 2: 内部元数据
-		_endpointId: endpoint.id,
-		_modelId: model.id,
-		_toolCalling: caps.toolCalling ?? false,
-		_hasApiKey: hasApiKey,
-	};
+	} as vscode.LanguageModelChatInformation & { isUserSelectable: boolean; statusIcon?: vscode.ThemeIcon };
 }
 
 /**
@@ -67,27 +80,31 @@ export function collectModels(
 	for (const ep of endpoints) {
 		const hasKey = availability.get(ep.id) ?? false;
 		for (const model of ep.models) {
-			const info = toLanguageModelChatInformation(ep, model, hasKey);
-			// Phase 2: Agent 模式过滤 (T010a)
-			if (agentMode && info._toolCalling === false) {
-				logger.debug(`Agent 模式: 跳过不支持工具调用的模型 ${info.id}`);
+			const caps = model.capabilities ?? {};
+			const toolCalling = caps.toolCalling ?? false;
+			// Agent 模式过滤
+			if (agentMode && toolCalling === false) {
+				logger.debug(`Agent 模式: 跳过不支持工具调用的模型 ${ep.id}/${model.id}`);
 				continue;
 			}
-			models.push(info);
+			models.push(toLanguageModelChatInformation(ep, model, hasKey));
 		}
 	}
-
 	return models;
 }
 
 /**
- * Phase 2: 从完整模型 ID 提取端点 ID 和模型 ID
+ * 从模型 ID 提取端点 ID 和模型 ID（优先使用 modelRouter 查找）
  */
 export function parseModelId(fullModelId: string): { endpointId: string; modelId: string } | undefined {
-	const slashIndex = fullModelId.indexOf('/');
-	if (slashIndex === -1) { return undefined; }
+	// 优先查路由表
+	const routed = modelRouter.get(fullModelId);
+	if (routed) { return routed; }
+	// 回退：按 __ 分隔符解析
+	const sepIndex = fullModelId.indexOf('__');
+	if (sepIndex === -1) { return undefined; }
 	return {
-		endpointId: fullModelId.substring(0, slashIndex),
-		modelId: fullModelId.substring(slashIndex + 1),
+		endpointId: fullModelId.substring(0, sepIndex),
+		modelId: fullModelId.substring(sepIndex + 2),
 	};
 }

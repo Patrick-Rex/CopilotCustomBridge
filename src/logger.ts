@@ -40,6 +40,13 @@ export function getDebugMode(): DebugMode {
 	return _mode;
 }
 
+/** 初始化日志通道（确保 Output 面板始终可见） */
+export function initChannel(): void {
+	channel(); // 强制创建 OutputChannel
+	channel().appendLine(`[${timestamp()}] [INFO] 日志通道已初始化`);
+	channel().show(true); // 不抢占焦点，但确保可见
+}
+
 /** 初始化转储系统（需要 ExtensionContext 访问 globalStorageUri） */
 export function initDumpSystem(context: vscode.ExtensionContext): void {
 	_context = context;
