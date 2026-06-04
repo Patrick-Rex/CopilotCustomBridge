@@ -10,6 +10,7 @@ import { extractDataParts } from '../convert';
 import { OpenAIClient } from '../../client';
 import { AuthManager } from '../../auth';
 import { VISION_PROXY_PROMPT } from '../../consts';
+import type { OpenAIContentPart } from '../../client/types';
 import type { VisionProxyResult } from './types';
 import * as logger from '../../logger';
 
@@ -69,12 +70,22 @@ export async function resolveImageMessages(
 			const descriptions: string[] = [];
 
 			for (let j = 0; j < dataParts.length; j++) {
+				const dp = dataParts[j];
+				const content: OpenAIContentPart[] = [
+					{ type: 'text', text: VISION_PROXY_PROMPT },
+					{
+						type: 'image_url',
+						image_url: {
+							url: `data:${dp.mimeType};base64,${Buffer.from(dp.data).toString('base64')}`,
+						},
+					},
+				];
 				const desc = await client.chatCompletion({
 					model: proxyModelId,
 					messages: [
 						{
 							role: 'user',
-							content: VISION_PROXY_PROMPT,
+							content,
 						},
 					],
 					max_tokens: 1024,

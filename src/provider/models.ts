@@ -8,7 +8,8 @@
  */
 
 import * as vscode from 'vscode';
-import type { EndpointConfig, ModelConfig } from '../types';
+import type { EndpointConfig, ModelConfig, ThinkingEffort } from '../types';
+import { THINKING_EFFORT_PICKER_DEFAULTS } from '../types';
 import { DEFAULT_VERSION } from '../consts';
 import * as logger from '../logger';
 
@@ -41,14 +42,16 @@ export function toLanguageModelChatInformation(
 ): vscode.LanguageModelChatInformation {
 	const caps = model.capabilities ?? {};
 	const modelId = `${endpoint.id}__${model.id}`;
+	const supportsReasoningEffort = resolveSupportedReasoningEfforts(caps);
+	const imageInput = caps.imageInput ?? caps.vision ?? false;
 
 	// 注册路由信息
 	modelRouter.set(modelId, endpoint.id, model.id);
 
-	return {
+	const info = {
 		id: modelId,
 		name: model.name,
-		family: 'copilot-custom-bridge',
+		family: model.family || endpoint.name || 'copilot-custom-bridge',
 		version: model.version || DEFAULT_VERSION,
 		detail: hasApiKey ? `${endpoint.name} / ${model.name}` : '⚠️ 请先设置 API Key',
 		tooltip: hasApiKey ? undefined : '未配置 API Key，模型不可用',
@@ -57,10 +60,28 @@ export function toLanguageModelChatInformation(
 		isUserSelectable: true,
 		statusIcon: hasApiKey ? undefined : new vscode.ThemeIcon('warning'),
 		capabilities: {
-			imageInput: caps.imageInput ?? false,
+			imageInput,
 			toolCalling: caps.toolCalling ?? false,
 		},
-	} as vscode.LanguageModelChatInformation & { isUserSelectable: boolean; statusIcon?: vscode.ThemeIcon };
+		vision: imageInput,
+		thinking: caps.thinking ?? supportsReasoningEffort.length > 0,
+		supportsReasoningEffort,
+	} as vscode.LanguageModelChatInformation & {
+		isUserSelectable: boolean;
+		statusIcon?: vscode.ThemeIcon;
+		vision?: boolean;
+		thinking?: boolean;
+		supportsReasoningEffort?: readonly ThinkingEffort[];
+	};
+
+	return info;
+}
+
+function resolveSupportedReasoningEfforts(caps: ModelConfig['capabilities']): readonly ThinkingEffort[] {
+	if (caps?.supportsReasoningEffort && caps.supportsReasoningEffort.length > 0) {
+		return caps.supportsReasoningEffort;
+	}
+	return caps?.thinking ? THINKING_EFFORT_PICKER_DEFAULTS : [];
 }
 
 /**

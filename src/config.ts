@@ -6,7 +6,7 @@
 
 import * as vscode from 'vscode';
 import type { EndpointConfig, ModelConfig, ModelCapabilities, ThinkingEffort, ModelCacheEntry } from './types';
-import { THINKING_EFFORT_DEFAULT } from './types';
+import { THINKING_EFFORT_DEFAULT, THINKING_EFFORT_VALUES } from './types';
 import { CONFIG_SECTION } from './consts';
 import * as logger from './logger';
 
@@ -18,14 +18,32 @@ function rawConfig(): vscode.WorkspaceConfiguration {
 	return vscode.workspace.getConfiguration(CONFIG_SECTION);
 }
 
-/** 规范化用户配置的能力字段（兼容 toolCalls→toolCalling 等别名） */
-function normalizeCapabilities(raw: Record<string, unknown> | undefined): ModelConfig['capabilities'] {
-	if (!raw || typeof raw !== 'object') { return undefined; }
-	const caps: Record<string, unknown> = { ...raw };
+/** 规范化用户配置的能力字段（兼容 toolCalls→toolCalling、vision→imageInput 等别名） */
+function normalizeCapabilities(
+	raw: Record<string, unknown> | undefined,
+	modelRaw?: Record<string, unknown>,
+): ModelConfig['capabilities'] {
+	const caps: Record<string, unknown> = raw && typeof raw === 'object' ? { ...raw } : {};
+
+	// VS Code 新文档的模型字段是顶层；插件旧配置使用 capabilities 内嵌。两者都接受，内嵌优先。
+	for (const key of ['toolCalling', 'toolCalls', 'imageInput', 'vision', 'thinking', 'supportsReasoningEffort', 'thinkingEffort', 'visionProxy']) {
+		if (modelRaw && key in modelRaw && !(key in caps)) {
+			caps[key] = modelRaw[key];
+		}
+	}
+
+	if (Object.keys(caps).length === 0) { return undefined; }
 
 	// 兼容别名: toolCalls → toolCalling
 	if ('toolCalls' in caps && !('toolCalling' in caps)) {
 		caps.toolCalling = caps.toolCalls;
+	}
+	if ('vision' in caps && !('imageInput' in caps)) {
+		caps.imageInput = caps.vision;
+	}
+	if (Array.isArray(caps.supportsReasoningEffort)) {
+		caps.supportsReasoningEffort = caps.supportsReasoningEffort
+			.filter((v): v is ThinkingEffort => typeof v === 'string' && THINKING_EFFORT_VALUES.includes(v as ThinkingEffort));
 	}
 	// 过滤掉不支持的能力字段
 	delete caps.toolCalls;
@@ -95,7 +113,7 @@ function validateEndpoint(ep: unknown, index: number): EndpointConfig | undefine
 			version: typeof m?.version === 'string' ? m.version : undefined,
 			maxInputTokens: maxInput,
 			maxOutputTokens: maxOutput,
-			capabilities: normalizeCapabilities(m?.capabilities as Record<string, unknown> | undefined),
+			capabilities: normalizeCapabilities(m?.capabilities as Record<string, unknown> | undefined, m),
 		});
 	}
 

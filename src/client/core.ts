@@ -227,15 +227,15 @@ class OpenAIClientImpl {
 				}
 				const bodyJson = JSON.stringify(requestBody);
 
-			// 构建 fetch 选项（合并端点级 defaultHeaders + 自定义认证头）
-			const mergedHeaders: Record<string, string> = {
-				...this.options.defaultHeaders,
-				'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
-				'Authorization': `Bearer ${this.apiKey}`,
-			};
-			if (this.options.authHeader && this.options.authHeader !== 'Authorization') {
-				mergedHeaders[this.options.authHeader] = this.apiKey;
-			}
+				// 构建 fetch 选项（合并端点级 defaultHeaders + 自定义认证头）
+				const mergedHeaders: Record<string, string> = {
+					...this.options.defaultHeaders,
+					'Content-Type': HTTP_CONFIG.CONTENT_TYPE,
+					'Authorization': `Bearer ${this.apiKey}`,
+				};
+				if (this.options.authHeader && this.options.authHeader !== 'Authorization') {
+					mergedHeaders[this.options.authHeader] = this.apiKey;
+				}
 				const fetchInit: RequestInit & { dispatcher?: unknown } = {
 					method: 'POST',
 					headers: mergedHeaders,
@@ -261,8 +261,8 @@ class OpenAIClientImpl {
 				// 注册取消
 				const cancelListener = cancelToken
 					? cancelToken.onCancellationRequested(() => {
-							controller.abort();
-						})
+						controller.abort();
+					})
 					: undefined;
 
 				try {

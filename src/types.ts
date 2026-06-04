@@ -13,11 +13,13 @@
 // Thinking 推理力度枚举 (Phase 2)
 // ============================================================================
 
-export type ThinkingEffort = 'none' | 'low' | 'high' | 'max';
+export type ThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'max';
 
-export const THINKING_EFFORT_VALUES: readonly ThinkingEffort[] = ['none', 'low', 'high', 'max'] as const;
+export const THINKING_EFFORT_VALUES: readonly ThinkingEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'max'] as const;
 
 export const THINKING_EFFORT_DEFAULT: ThinkingEffort = 'none';
+
+export const THINKING_EFFORT_PICKER_DEFAULTS: readonly ThinkingEffort[] = ['low', 'medium', 'high'] as const;
 
 // ============================================================================
 // 模型能力声明 (Phase 2 全面生效)
@@ -28,8 +30,12 @@ export interface ModelCapabilities {
 	readonly toolCalling?: boolean | number;
 	/** 图像输入能力 */
 	readonly imageInput?: boolean;
+	/** VS Code 新配置字段别名：是否支持视觉输入 */
+	readonly vision?: boolean;
 	/** 思考模式 */
 	readonly thinking?: boolean;
+	/** VS Code 模型选择器中的可选推理力度 */
+	readonly supportsReasoningEffort?: readonly ThinkingEffort[];
 	/** 覆盖端点级视觉代理模型 ID (Phase 2) */
 	readonly visionProxy?: string;
 	/** 覆盖端点级推理力度 (Phase 2) */

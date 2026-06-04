@@ -107,7 +107,9 @@
                 "type": "string",
                 "enum": [
                   "none",
+                  "minimal",
                   "low",
+                  "medium",
                   "high",
                   "max"
                 ],
@@ -150,6 +152,39 @@
                       "default": 4096,
                       "description": "%config.endpoints.items.models.items.maxOutputTokens%"
                     },
+                    "toolCalling": {
+                      "type": [
+                        "boolean",
+                        "number"
+                      ],
+                      "default": false,
+                      "description": "%config.endpoints.items.models.items.capabilities.toolCalling%"
+                    },
+                    "vision": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "%config.endpoints.items.models.items.capabilities.vision%"
+                    },
+                    "thinking": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "%config.endpoints.items.models.items.capabilities.thinking%"
+                    },
+                    "supportsReasoningEffort": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "max"
+                        ]
+                      },
+                      "description": "%config.endpoints.items.models.items.capabilities.supportsReasoningEffort%"
+                    },
                     "capabilities": {
                       "type": "object",
                       "properties": {
@@ -164,9 +199,29 @@
                           "type": "boolean",
                           "default": false
                         },
+                        "vision": {
+                          "type": "boolean",
+                          "default": false,
+                          "description": "%config.endpoints.items.models.items.capabilities.vision%"
+                        },
                         "thinking": {
                           "type": "boolean",
                           "default": false
+                        },
+                        "supportsReasoningEffort": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "minimal",
+                              "low",
+                              "medium",
+                              "high",
+                              "max"
+                            ]
+                          },
+                          "description": "%config.endpoints.items.models.items.capabilities.supportsReasoningEffort%"
                         },
                         "visionProxy": {
                           "type": "string",
@@ -176,7 +231,9 @@
                           "type": "string",
                           "enum": [
                             "none",
+                            "minimal",
                             "low",
+                            "medium",
                             "high",
                             "max"
                           ],

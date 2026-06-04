@@ -93,7 +93,7 @@ export interface OpenAIChatRequest {
 	max_tokens?: number;
 	tools?: OpenAITool[];
 	tool_choice?: 'auto' | 'none' | 'required';
-	reasoning_effort?: 'none' | 'low' | 'high' | 'max';
+	reasoning_effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'max';
 }
 
 export interface OpenAIChatResponse {
@@ -163,6 +163,8 @@ export interface ModelListEntry {
 	capabilities?: {
 		toolCalling?: boolean | number;
 		imageInput?: boolean;
+		vision?: boolean;
 		thinking?: boolean;
+		supportsReasoningEffort?: readonly ('none' | 'minimal' | 'low' | 'medium' | 'high' | 'max')[];
 	};
 }

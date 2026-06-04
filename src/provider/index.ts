@@ -17,6 +17,8 @@ import { buildChatRequest } from './request';
 import { convertVSCodeToolsToOpenAI } from './tools/request';
 import { findPreflightTools } from './tools/flow';
 import { resolveImageMessages } from './vision';
+import type { ThinkingEffort } from '../types';
+import { THINKING_EFFORT_VALUES } from '../types';
 
 import * as logger from '../logger';
 
@@ -151,11 +153,12 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 					logger.debug(`  [${mi}] role=${roleVal} contentType=${ct} partTypes=${JSON.stringify(pt)} partKeys=${JSON.stringify(keys)}`);
 				}
 			}
+			const imageInputCapable = capabilities.imageInput ?? capabilities.vision ?? false;
 			const { resolvedMessages } = await resolveImageMessages(
 				messages as vscode.LanguageModelChatRequestMessage[],
 				endpointId,
 				apiModelId,
-				capabilities.imageInput ?? false,
+				imageInputCapable,
 				token,
 			);
 
@@ -190,8 +193,8 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 				? convertVSCodeToolsToOpenAI(options.tools, toolLimit)
 				: undefined;
 
-			// 推理力度
-			const thinkingEffort = ConfigManager.getThinkingEffort(endpointId, apiModelId);
+			// 推理力度：优先使用模型选择器传入的值，回退到插件配置默认值。
+			const thinkingEffort = this.resolveReasoningEffort(options, endpointId, apiModelId);
 
 			// 模型 ID 覆盖
 			const modelIdOverride = ConfigManager.getModelIdOverride(apiModelId);
@@ -266,6 +269,24 @@ class CustomBridgeProviderImpl implements vscode.LanguageModelChatProvider {
 			default:
 				return `❌ ${error.message}`;
 		}
+	}
+
+	private resolveReasoningEffort(
+		options: vscode.ProvideLanguageModelChatResponseOptions,
+		endpointId: string,
+		apiModelId: string,
+	): ThinkingEffort {
+		const modelOptions = options.modelOptions as Record<string, unknown> | undefined;
+		const selected = modelOptions?.reasoningEffort
+			?? modelOptions?.reasoning_effort
+			?? modelOptions?.thinkingEffort
+			?? modelOptions?.['thinking.effort'];
+
+		if (typeof selected === 'string' && THINKING_EFFORT_VALUES.includes(selected as ThinkingEffort)) {
+			return selected as ThinkingEffort;
+		}
+
+		return ConfigManager.getThinkingEffort(endpointId, apiModelId);
 	}
 
 	/** 强制 Copilot Chat 刷新模型选择器 */

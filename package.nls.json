@@ -21,7 +21,9 @@
   "config.endpoints.items.models.items.maxOutputTokens": "Maximum output tokens",
   "config.endpoints.items.models.items.capabilities.toolCalling": "Tool calling capability: false = unsupported, true = unlimited, number = max tools",
   "config.endpoints.items.models.items.capabilities.imageInput": "Image input capability",
+  "config.endpoints.items.models.items.capabilities.vision": "Vision/image input capability (VS Code model config alias)",
   "config.endpoints.items.models.items.capabilities.thinking": "Thinking/reasoning mode",
+  "config.endpoints.items.models.items.capabilities.supportsReasoningEffort": "Reasoning effort levels shown in the model picker",
   "config.endpoints.items.models.items.capabilities.visionProxy": "Override endpoint-level vision proxy model ID (Phase 2)",
   "config.endpoints.items.models.items.capabilities.thinkingEffort": "Override endpoint-level thinking effort (Phase 2)",
 

@@ -21,7 +21,9 @@
   "config.endpoints.items.models.items.maxOutputTokens": "最大输出 token",
   "config.endpoints.items.models.items.capabilities.toolCalling": "工具调用能力：false=不支持，true=支持无上限，number=工具数量上限",
   "config.endpoints.items.models.items.capabilities.imageInput": "图像输入能力",
+  "config.endpoints.items.models.items.capabilities.vision": "视觉/图像输入能力（VS Code 模型配置别名）",
   "config.endpoints.items.models.items.capabilities.thinking": "思考/推理模式",
+  "config.endpoints.items.models.items.capabilities.supportsReasoningEffort": "模型选择器中显示的推理力度选项",
   "config.endpoints.items.models.items.capabilities.visionProxy": "覆盖端点级视觉代理模型 ID（Phase 2）",
   "config.endpoints.items.models.items.capabilities.thinkingEffort": "覆盖端点级推理力度（Phase 2）",
 

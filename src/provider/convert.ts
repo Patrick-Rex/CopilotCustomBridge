@@ -144,7 +144,7 @@ function dumpContentStructure(content: unknown): {
  * LanguageModelChatRequestMessage 的内容可能是:
  * - 字符串
  * - Part 数组，文本 Part 有 value 属性（可能无 type 字段）
- * - 图片 Part 有 mimeType/data，不提取
+ * - 图片 Part 有 image/* mimeType 和 data，不提取
  */
 function extractTextContent(msg: vscode.LanguageModelChatRequestMessage): string {
 	if (typeof msg.content === 'string') {
@@ -156,8 +156,8 @@ function extractTextContent(msg: vscode.LanguageModelChatRequestMessage): string
 		for (const part of msg.content) {
 			if (typeof part === 'object' && part !== null) {
 				const p = part as Record<string, unknown>;
-				// 文本 part: 有 value 且不是图片（无 mimeType）
-				if (typeof p.value === 'string' && !p.mimeType) {
+				// 文本 part: 有 value 且不是图片
+				if (typeof p.value === 'string' && !isImageDataPart(p)) {
 					parts.push(p.value);
 				}
 				// 忽略 tool call result, image 等其他类型
@@ -254,7 +254,8 @@ function extractReasoningContent(msg: vscode.LanguageModelChatRequestMessage): s
 /**
  * Phase 2: 提取图片数据部分
  *
- * VS Code 图片 Part 有 mimeType 和 data 属性（可能无 type 字段）
+ * VS Code 图片 Part 有 image/* mimeType 和 data 属性（可能无 type 字段）。
+ * 一些非图片上下文数据也带 mimeType/data/audience，不能按“有 data 就是图片”处理。
  */
 export function extractDataParts(
 	msg: vscode.LanguageModelChatRequestMessage,
@@ -265,10 +266,15 @@ export function extractDataParts(
 	const parts: Array<{ mimeType: string; data: Uint8Array }> = [];
 	for (const part of msg.content) {
 		const p = part as Record<string, unknown>;
-		// 图片 part: 有 mimeType 和 data（无论有无 type 字段）
-		if (typeof p.mimeType === 'string' && p.data instanceof Uint8Array) {
+		if (isImageDataPart(p)) {
 			parts.push({ mimeType: p.mimeType as string, data: p.data as Uint8Array });
 		}
 	}
 	return parts;
+}
+
+function isImageDataPart(part: Record<string, unknown>): boolean {
+	return typeof part.mimeType === 'string'
+		&& part.mimeType.toLowerCase().startsWith('image/')
+		&& part.data instanceof Uint8Array;
 }
